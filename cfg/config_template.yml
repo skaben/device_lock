@@ -1,0 +1,9 @@
+# SKABEN LOCK config
+
+dev_type: 'lock'
+broker_ip: '192.168.0.200'
+iface: ${iface}
+db_name: 'device.db'
+comport: '/dev/ttyS1'
+pin: 11
+
