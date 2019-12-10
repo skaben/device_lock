@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 PYVER='3.7'
+trap "exit" INT
 
 help () 
 {
@@ -45,7 +46,7 @@ deploy () {
   PKG_OK=$(dpkg-query -W --showformat='${Status}\n' sqlite3|grep "install ok installed") 
  
   if [[ "$PKG_OK" == "" ]]; then
-    $SQLITE="sqlite3"
+    SQLITE="sqlite3"
   fi
  
   subver=$(python3 -c 'import sys; print(sys.version_info[1])')
@@ -57,7 +58,7 @@ deploy () {
     $PYTHON="python$PYVER"
   fi
 
-  sudo apt-get install -y -no-install-recommends $SQLITE $PYTHON $PYTHON_VENV
+  sudo apt-get install -y --no-install-recommends $SQLITE $PYTHON $PYTHON_VENV
 
   echo -e "setting up virtual environment"
   if  [ -d "./venv" ]; then 
@@ -69,8 +70,9 @@ deploy () {
   $PY -m pip install --upgrade pip
   pip install -r requirements.txt --no-cache-dir
   # unpacking resources
-  tar xvzf resources.tar.gz
-  rm resources.tar.gz
+  if [ -f "./resources.tar.gz" ]; then
+    tar xvzf resources.tar.gz
+  fi
   echo -e "... done!\n"
   echo -e "\n  --------"
   echo -e "  How to autostart with systemd:\n"\
