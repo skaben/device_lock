@@ -9,7 +9,7 @@ from netifaces import AF_INET
 from pygame.mixer import Sound
 
 import wiringpi as wpi
-from helpers import make_event
+from skabenclient.helpers import make_event
 
 CURRENT = os.path.dirname(os.path.realpath(__file__))
 sound_dir = os.path.join(CURRENT, 'resources', 'sound')

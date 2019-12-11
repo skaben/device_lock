@@ -1,6 +1,6 @@
 import logging
 
-from skabenclient.managers import DeviceHandler
+from skabenclient.managers import DeviceManager
 
 
 class LockHandler(DeviceManager):

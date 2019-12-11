@@ -4,7 +4,8 @@ import skabenclient as client
 from handler import LockHandler
 from device import LockDevice
 
-config = client.helpers.get_config()
+conf_path = os.path.join('cfg', 'config.yml')
+config = client.helpers.get_config(conf_path)
 
 device = LockDevice(config)
 handler = LockHandler(config)
