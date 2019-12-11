@@ -1,8 +1,9 @@
 import logging
-from skabenclient.handlers import DeviceHandler
+
+from skabenclient.managers import DeviceHandler
 
 
-class LockHandler(DeviceHandler):
+class LockHandler(DeviceManager):
     def __init__(self, config):
         super().__init__(config)
 
@@ -32,5 +33,3 @@ class LockHandler(DeviceHandler):
                 self.dev.close()
         except:
             logging.exception('lock operation error')
-
-

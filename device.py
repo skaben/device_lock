@@ -22,7 +22,7 @@ except:
 # TODO: sound disable in status closed
 # TODO: sound by pin status, not by database
 
-class LockBox:
+class LockDevice:
     
     alert = 5  # alert level on wrong player action
  

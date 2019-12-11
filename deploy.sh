@@ -4,7 +4,7 @@ PYVER='3.7'
 
 help () 
 {
-  echo "Usage: deploy.sh [install|reload]"
+  echo "Usage: deploy.sh [install|reset]"
   exit
 }
 
@@ -25,11 +25,11 @@ check_uname () {
     echo -e " > Sorry, only Debian-based distros supported for auto-deploy\n"\
     "> manual process:\n"\
     "   sqlite3 python3.7 python3.7-venv should be installed\n"\
-    "   sqlite3 device.db < cfg/lock.sql\n"\
-    "   touch ts\n"\
     "   python3.7 -m venv venv\n"\
     "   source ./venv/bin/activate\n"\
-    "   pip install -r requirements.txt\n"
+    "   pip install --upgrade pip\n"\
+    "   pip install -r requirements.txt\n"\
+    "   ./deploy.sh reset\n"
     exit
   fi
 }
@@ -50,7 +50,7 @@ deploy () {
  
   subver=$(python3 -c 'import sys; print(sys.version_info[1])')
   
-  if [[ $((subver + 1)) < 8 ]]; then
+  if [[ $((subver + 1)) != 7 ]]; then
     echo '[!] application require python'$PYVER
     echo '[!] your version is:' $(python3 --version)
     echo -e "trying to install python"$PYVER
@@ -65,7 +65,7 @@ deploy () {
   fi
   python$PYVER -m venv venv
   source "./venv/bin/activate"
-  PY=$(which python)
+  PY=$(which python$PYVER)
   $PY -m pip install --upgrade pip
   pip install -r requirements.txt --no-cache-dir
   # unpacking resources
@@ -75,22 +75,22 @@ deploy () {
   echo -e "\n  --------"
   echo -e "  How to autostart with systemd:\n"\
           " cp newlock.service /etc/systemd/system/\n"\
-          " systemctl daemon-reload\n"\
+          " systemctl daemon-reset\n"\
           " systemctl enable newlock"
   echo -e "  --------\n"
 
 }
 
-# reload
+# reset
 
-reload () 
+reset () 
 {
-  echo -e "[>] reloading __ LOCK __ device configuration"
-  if [ -f "./device.db" ]; then
-    rm -f "./device.db"
+  echo -e "[>] resetting __ LOCK __ device configuration"
+  if [ -f "./local.db" ]; then
+    rm -f "./local.db"
   fi
-  sqlite3 device.db < ./cfg/lock.sql
-  touch ./ts device.log
+  sqlite3 "local.db" < ./cfg/lock.sql
+  touch ./ts "local.log"
   iface=$(ip route | grep "default" | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
   sed -e "s/\${iface}/'$iface'/" "cfg/config_template.yml" > "config_running.yml"
   echo "[>] done!"
@@ -101,9 +101,9 @@ reload ()
 if [ "$1" = 'install' ]; then
   check_uname
   deploy
-  reload 
-elif [ "$1" = 'reload' ]; then
-  reload 
+  reset 
+elif [ "$1" = 'reset' ]; then
+  reset 
 else
   help
 fi
