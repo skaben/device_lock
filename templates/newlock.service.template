@@ -3,7 +3,7 @@ Description=SKABEN Lock service
 After=network.target auditd.service
 
 [Service]
-ExecStart=${dir_path}/cfg/run.sh
+ExecStart=${dirpath}/cfg/run.sh
 Restart=on-failure
 Type=idle
 
