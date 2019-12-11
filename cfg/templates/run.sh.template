@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+source ${dir_path}/venv/bin/activate &&
+python ${dir_path}/app.py
