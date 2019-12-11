@@ -55,7 +55,7 @@ deploy () {
     echo '[!] application require python'$PYVER
     echo '[!] your version is:' $(python3 --version)
     echo -e "trying to install python"$PYVER
-    $PYTHON="python$PYVER"
+    PYTHON="python$PYVER"
   fi
 
   sudo apt-get install -y --no-install-recommends $SQLITE $PYTHON $PYTHON_VENV
