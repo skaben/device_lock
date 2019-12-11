@@ -1,6 +1,6 @@
 # local
 resources/
-config_running.yml
+conf/
 ts
 *.log
 *.db

@@ -17,7 +17,7 @@ class LockHandler(DeviceManager):
             data['uid'] = self.config.get('uid')
             super().local_update(data)
             self.commit()
-        except:
+        except Exception:
             self.rollback()
 
     def reset_device(self):
@@ -31,5 +31,5 @@ class LockHandler(DeviceManager):
                 self.dev.open()
             else:
                 self.dev.close()
-        except:
+        except Exception:
             logging.exception('lock operation error')
