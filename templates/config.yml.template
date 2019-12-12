@@ -6,4 +6,5 @@ iface: ${iface}
 db_name: 'local.db'
 comport: '/dev/ttyS1'
 pin: 11
+alert: 5
 

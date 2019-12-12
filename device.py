@@ -10,9 +10,6 @@ from pygame.mixer import Sound
 import wiringpi as wpi
 from skabenclient.helpers import make_event
 
-CURRENT = os.path.dirname(os.path.realpath(__file__))
-sound_dir = os.path.join(CURRENT, 'resources', 'sound')
-
 try:
     pg.mixer.pre_init()
 except Exception:
@@ -24,8 +21,6 @@ except Exception:
 
 class LockDevice:
 
-    alert = 5  # alert level on wrong player action
-
     serial_lock = None
     lock_timer = None
     sound = None
@@ -35,20 +30,21 @@ class LockDevice:
     def __init__(self, config):
         self.port = None
         self.plot = dict()
-        self.pin = config.get('pin')
-        self.q_int = config.get('q_int')
-        self.config = config
         self.result = ''
+        # set config values (without gorillas, bananas and jungles)
+        self.uid = config.uid
+        self.pin = config.pin
+        self.q_int = config.q_int
+        self.alert = config.alert
+        self.sound_dir = config.sound_dir
         # setup gpio and serial listener
         self.gpio_setup()
         self.data_queue = Queue()
         self.data_thread = th.Thread(target=self._serial_read,
                                      name='serial read Thread',
                                      args=(self.port, self.data_queue,))
-
-        # sound setup
-        self.snd_module = self.pg_mix_reinit()
-        self.close()
+        self.snd_module = self.pg_mix_reinit()  # setup sound
+        self.close()  # turn on laser door, closing lock
 
     def pg_mix_reinit(self):
         try:
@@ -70,7 +66,7 @@ class LockDevice:
 
     def _snd(self, fname):
         try:
-            snd = Sound(file=os.path.join(sound_dir, fname))
+            snd = Sound(file=os.path.join(self.sound_dir, fname))
             snd.set_volume(1)
             return snd
         except FileNotFoundError:
@@ -170,7 +166,7 @@ class LockDevice:
         # logging.debug('new user event from {}'.format(delta))
         logging.debug('plot now {}'.format(self.plot))
         if delta:
-            delta['uid'] = self.config['uid']
+            delta['uid'] = self.uid
             event = make_event('device', 'input', delta)
             self.q_int.put(event)
         # else do nothing - for mitigating possible loop in q_int 'device'
