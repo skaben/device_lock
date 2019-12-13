@@ -2,7 +2,7 @@
 --extra-index-url https://pypi.org/simple/
 
 skabenclient>=0.3
-pygame==1.9.4
+pygame>=1.9.4
 pyaml==18.11.0
 pyserial==3.4
 wiringpi==2.46.0
