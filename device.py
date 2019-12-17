@@ -5,10 +5,10 @@ import time
 import os
 import threading as th
 from queue import Queue
-from pygame.mixer import Sound
 
 import wiringpi as wpi
 from skabenclient.helpers import make_event
+from skabenclient.loaders import SoundLoader
 
 try:
     pg.mixer.pre_init()
@@ -24,7 +24,7 @@ class LockDevice:
     serial_lock = None
     lock_timer = None
     sound = None
-    snd_module = None
+    snd = None
     opened = None
 
     def __init__(self, config):
@@ -36,41 +36,14 @@ class LockDevice:
         self.pin = config.pin
         self.q_int = config.q_int
         self.alert = config.alert
-        self.sound_dir = config.sound_dir
+        self.snd = SoundLoader(config.sound_dir)
         # setup gpio and serial listener
         self.gpio_setup()
         self.data_queue = Queue()
         self.data_thread = th.Thread(target=self._serial_read,
                                      name='serial read Thread',
                                      args=(self.port, self.data_queue,))
-        self.snd_module = self.pg_mix_reinit()  # setup sound
         self.close()  # turn on laser door, closing lock
-
-    def pg_mix_reinit(self):
-        try:
-            pg.mixer.init()
-            self.channel_bg = pg.mixer.Channel(1)
-            self.channel_fg = pg.mixer.Channel(2)
-
-            self.snd_field = self._snd('field.ogg')
-            self.snd_off = self._snd('poweroff.ogg')
-            self.snd_on = self._snd('poweron.ogg')
-            self.snd_block = self._snd('bad_code.ogg')
-            snd = True
-            logging.info('sound module initiated')
-        except Exception:
-            logging.exception('pg mixer init failed')
-            snd = None
-        finally:
-            return snd
-
-    def _snd(self, fname):
-        try:
-            snd = Sound(file=os.path.join(self.sound_dir, fname))
-            snd.set_volume(1)
-            return snd
-        except FileNotFoundError:
-            logging.exception('no such file')
 
     def _serial_read(self, port, queue):
         logging.debug('start listening serial: {}'.format(port))
@@ -84,16 +57,16 @@ class LockDevice:
 
     def sound_off(self):
         self.sound = None
-        if self.snd_module:
+        if self.sndm:
             logging.debug('sound OFF')
-            for ch in (self.channel_bg, self.channel_fg):
+            for ch in self.sndm.channels:
                 ch.fadeout(300)
 
     def sound_on(self):
         if not pg.mixer.get_init():
             pg.mixer.quit()
             self.pg_mixer_reinit()
-        if self.snd_module:
+        if self.sndm.enabled:
             logging.debug('sound ON')
             self.sound = True
 

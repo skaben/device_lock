@@ -5,6 +5,7 @@ broker_ip: '192.168.0.200'
 iface: ${iface}
 db_name: 'local.db'
 comport: '/dev/ttyS1'
+sound_dir: '${dirpath}/resources/sound'
 pin: 11
 alert: 5
 
