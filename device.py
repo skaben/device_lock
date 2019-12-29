@@ -29,17 +29,17 @@ class LockDevice:
     closed = None
     port = None
 
-    def __init__(self, config):
+    def __init__(self, system_config, device_config):
         self.port = None
-        self.plot = dict()
+        self.plot = device_config
         self.result = ''
         # set config values (without gorillas, bananas and jungles)
-        self.uid = config.uid
-        self.pin = config.pin
-        self.q_int = config.q_int
-        self.alert = config.alert
+        self.uid = system_config.uid
+        self.pin = system_config.pin
+        self.q_int = system_config.q_int
+        self.alert = system_config.alert
         # set sound
-        self.snd = self._snd_init(config.sound_dir)
+        self.snd = self._snd_init(system_config.sound_dir)
         # setup gpio and serial listener
         self.gpio_setup()
         self.data_queue = Queue()
@@ -132,14 +132,12 @@ class LockDevice:
         raise SystemExit
 
     def state_update(self, msg):
-        """ Update state by user input
-            msg: {'blocked': True}
-        """
+        """ Update device configuration from user actions """
         if not isinstance(msg, dict):
             logging.error('message type not dict: {}\n{}'
                           .format(type(msg), msg))
             return
-        self.plot['alert'] = 0  # resetting alert
+        # self.plot.set('alert', 0)  # resetting alert # TODO: what's happening here??
         # delta_keys used later for sending package to server
         delta = {}
         logging.debug('plot was {}'.format(self.plot))
@@ -147,8 +145,8 @@ class LockDevice:
             # make diff
             old_value = self.plot.get(key, None)
             if msg[key] != old_value:
-                self.plot[key] = msg[key]  # direct update without manager
                 delta[key] = msg[key]
+        self.plot.save(payload=delta)
         # if state changed - send event
         # logging.debug('new user event from {}'.format(delta))
         logging.debug('plot now {}'.format(self.plot))

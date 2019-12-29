@@ -1,27 +1,28 @@
 import logging
 
-from skabenclient.managers import DeviceManager
+from skabenclient.config import DeviceConfig
 
 
-class LockHandler(DeviceManager):
-    def __init__(self, config):
-        super().__init__(config)
+# TODO: naming handler to config
+class LockHandler(DeviceConfig):
+    def __init__(self, config_path):
+        super().__init__(config_path)
+        self.data = self.load()
 
     def local_update(self, data):
+        """ TODO: rewrite totally """
         try:
             card_list = data.get('card_list')
-            if isinstance(card_list, list):
-                if len(card_list) == 0:
-                    data['card_list'] = ''
-                data['card_list'] = ';'.join(card_list)
-            data['uid'] = self.config.get('uid')
-            super().local_update(data)
-            self.commit()
+            # TODO: Whaaaaa?
+            # if isinstance(card_list, list):
+            #     data['card_list'] = card_list
+            self.save(data)
         except Exception:
-            self.rollback()
+            raise
 
     def reset_device(self):
-        super().reset_device()
+        """ Resetting from saved config """
+        super().load()
         logging.debug('resetting with plot\n\t{}'.format(self.dev.plot))
         try:
             if not self.dev.plot.get('sound'):
