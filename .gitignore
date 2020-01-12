@@ -4,6 +4,7 @@ conf/
 ts
 *.log
 *.db
+*.lock
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
