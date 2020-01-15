@@ -9,6 +9,7 @@ from queue import Queue
 import wiringpi as wpi
 from skabenclient.helpers import make_event
 from skabenclient.loaders import SoundLoader
+from skabenclient.device import BaseDevice
 
 try:
     pg.mixer.pre_init()
@@ -19,71 +20,101 @@ except Exception:
 # TODO: sound by pin status, not by database
 
 
-class LockDevice:
+class LockDevice(BaseDevice):
 
     """ Smart Lock device handler """
 
     serial_lock = None
     lock_timer = None
-    snd = None
+    snd = None  # sound module
     closed = None
-    port = None
+    running = None
 
-    def __init__(self, system_config, device_config):
+    def __init__(self, system_config):
+        super().__init__(system_config)
         self.port = None
-        self.plot = device_config
+        self.keypad_data_queue = None
+        self.keypad_thread = None
         self.result = ''
         # set config values (without gorillas, bananas and jungles)
-        self.uid = system_config.uid
-        self.pin = system_config.pin
-        self.q_int = system_config.q_int
-        self.alert = system_config.alert
+        self.pin = system_config.get('pin')
+        self.alert = system_config.get('alert')
         # set sound
-        self.snd = self._snd_init(system_config.sound_dir)
-        # setup gpio and serial listener
-        self.gpio_setup()
-        self.data_queue = Queue()
-        self.data_thread = th.Thread(target=self._serial_read,
-                                     name='serial read Thread',
-                                     args=(self.port, self.data_queue,))
-        self.close()  # turn on laser door, closing lock
+        self.snd = self._snd_init(system_config.get('sound_dir'))
 
     def run(self):
-        """ Running lock """
+        """ Running lock
+
+            self.gpio_setup() must be performed before run
+        """
+        if not self.port:
+            try:
+                self.gpio_setup()
+            except Exception as e:
+                raise Exception(f'gpio_setup failed, cannot start device:\n{e}')
+
         logging.info('running lock...')
         self.running = True
-        self.data_thread.start()
+        self.keypad_data_queue = Queue()
+        self.keypad_thread = th.Thread(target=self._serial_read,
+                                     name='serial read Thread',
+                                     args=(self.port, self.keypad_data_queue,))
+        self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
 
         while self.running:
-            # reading serial from keypads
-            if self.data_queue.empty():
-                # main routine
-                if self.snd:
-                    if self.plot.get('sound') and not self.snd.enabled:
-                        self.sound_on()
-                    elif not self.plot.get('sound') and self.snd.enabled:
-                        self.sound_off()
+            # main routine
+            if self.snd:
+                if self.config.get('sound') and not self.snd.enabled:
+                    self.sound_on()
+                elif not self.config.get('sound') and self.snd.enabled:
+                    self.sound_off()
 
-                    if self.plot.get('closed'):
-                        # play field sound without interrupts
-                        if not self.snd.channels['bg'].get_busy():
-                            self.snd.play(sound='field', channel='bg', loops=-1)
+                if self.config.get('closed'):
+                    # play field sound without interrupts
+                    if not self.snd.channels['bg'].get_busy():
+                        self.snd.play(sound='field', channel='bg', loops=-1)
 
-                if self.plot.get('blocked'):
-                    continue
-                if not self.plot.get('closed'):
-                    # close by timer
-                    if self.check_timer(int(time.time())):
-                        self.set_closed()
-                time.sleep(.1)
-            else:
-                data = self.data_queue.get()
+            if not self.config.get('closed'):
+                # close by timer
+                if self.check_timer(int(time.time())):
+                    self.set_closed()
+
+            if not self.keypad_data_queue.empty():
+                # reading serial from keypads
+                data = self.keypad_data_queue.get()
                 if data:
                     self.parse_data(data)
+            else:
+                time.sleep(.1)
+
+            if self.config.get('blocked'):
+                continue
         else:
             return self.stop()
+
+    def reset(self):
+        """ Resetting from saved config """
+        super().reset()
+        try:
+            if self.snd:
+                if self.config.get('sound'):
+                    self.snd.enabled = True
+                else:
+                    self.snd.enabled = None
+            if self.config.get('opened'):
+                self.lock_timer = None  # drop timer
+                self.open()
+            else:
+                self.close()
+        except Exception:
+            logging.exception('lock operation error')
+
+    def stop(self):
+        """ Full stop """
+        wpi.digitalWrite(self.pin, False)
+        raise SystemExit
 
     def set_opened(self, timer=None, ident='system'):
         """ Wrapper for open operation """
@@ -126,43 +157,6 @@ class LockDevice:
             self.closed = True  # state of GPIO
             return 'close lock'
 
-    def stop(self):
-        """ Full stop """
-        wpi.digitalWrite(self.pin, False)
-        raise SystemExit
-
-    def state_update(self, msg):
-        """ Update device configuration from user actions """
-        if not isinstance(msg, dict):
-            logging.error('message type not dict: {}\n{}'
-                          .format(type(msg), msg))
-            return
-        # self.plot.set('alert', 0)  # resetting alert # TODO: what's happening here??
-        # delta_keys used later for sending package to server
-        delta = {}
-        logging.debug('plot was {}'.format(self.plot))
-        for key in msg:
-            # make diff
-            old_value = self.plot.get(key, None)
-            if msg[key] != old_value:
-                delta[key] = msg[key]
-        self.plot.save(payload=delta)
-        # if state changed - send event
-        # logging.debug('new user event from {}'.format(delta))
-        logging.debug('plot now {}'.format(self.plot))
-        if delta:
-            delta['uid'] = self.uid
-            event = make_event('device', 'input', delta)
-            self.q_int.put(event)
-            return event
-        # else do nothing - for mitigating possible loop in q_int 'device'
-
-    def send_message(self, msg):
-        """ Send message to server """
-        event = make_event('device', 'send', msg)
-        self.q_int.put(event)
-        return f'sending message: {msg}'
-
     def parse_data(self, serial_data):
         """ Parse data from keypad """
         data = None
@@ -181,7 +175,7 @@ class LockDevice:
                 self.serial_lock = False
                 return
 
-            if self.plot.get('closed'):
+            if self.config.get('closed'):
                 # lock CLOSED
                 # keyboard event registered
                 if input_type == 'KB':
@@ -219,12 +213,12 @@ class LockDevice:
         self.result = ''  # additional clearing point
         _id = str(_id).lower()
         logging.debug(f'checking id {_id}')
-        if self.plot.get('blocked'):
+        if self.config.get('blocked'):
             if self.snd:
                 self.snd.play(sound='block', channel='fg')
                 return
 
-        cards = self.plot.get('card_list')
+        cards = self.config.get('card_list')
         if not cards:
             logging.error('lock ACL is empty - no card codes in DB')
             self.send_message({'message': 'alert',
@@ -236,7 +230,7 @@ class LockDevice:
 
         current_acl = cards.split(';')
         if _id in current_acl:
-            if not self.plot.get('closed'):
+            if not self.config.get('closed'):
                 self.set_closed(ident=_id)
             else:
                 self.set_opened(timer=True, ident=_id)
@@ -284,7 +278,7 @@ class LockDevice:
     def set_timer(self, now: int) -> int:
         if not now:
             now = '0'
-        t = int(self.plot.get('timer', 0))
+        t = int(self.config.get('timer', 0))
         logging.debug('lock timer start counting {}s'.format(t))
         if t <= 0:
             # no timer, lock will remain open until next server update
@@ -325,5 +319,6 @@ class LockDevice:
                     logging.debug("Connected to /dev/ttyAMA1")
             else:
                 logging.debug('failed to connect to serial')
-            time.sleep(1)
-
+            finally:
+                time.sleep(.5)
+        return self.port

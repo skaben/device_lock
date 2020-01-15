@@ -2,27 +2,31 @@ import os
 import pytest
 
 from skabenclient import main
-from skabenclient.config import Config
+from skabenclient.config import DeviceConfig, SystemConfig
 
-from smart_lock.handler import LockHandler
-from smart_lock.device import LockDevice
+from smart_lock.device import LockDevice, wpi
 
-@pytest.mark.skip
-def test_start_app(monkeypatch):
+
+def test_app_integrity(get_config, get_root, default_config, monkeypatch):
     """ Starting app test """
 
-    config_path = os.path.join('conf', 'config.yml')
-    config = Config(config_path)
+    app_config_path = os.path.join(get_root, "res", "app_config.yml")
+    dev_config_path = os.path.join(get_root, "res", "dev_config.yml")
 
-    device = LockDevice(config)
-    handler = LockHandler(config)
+    devcfg = get_config(DeviceConfig, default_config('dev'), dev_config_path)
+    syscfg = get_config(SystemConfig, default_config('sys'), app_config_path)
 
-    monkeypatch.setattr(main.Router, "start", lambda: True)
-    monkeypatch.setattr(main.CDLClient, "start", lambda: True)
-    monkeypatch.setattr(main.Router, "join", lambda: True)
-    monkeypatch.setattr(main.CDLClient, "join", lambda: True)
-    monkeypatch.setattr(LockHandler, "run", lambda: True)
+    syscfg.set('device_conf', devcfg.config_path)
 
-    main.start_app(config=config,
-                   device_handler=device,
-                   event_handler=handler)
+    monkeypatch.setattr(main.EventRouter, "start", lambda *a: True)
+    monkeypatch.setattr(main.EventRouter, "join", lambda *a: True)
+    monkeypatch.setattr(main.MQTTClient, "start", lambda *a: True)
+    monkeypatch.setattr(main.MQTTClient, "join", lambda *a: True)
+    monkeypatch.setattr(LockDevice, "run", lambda *a: True)
+    monkeypatch.setattr(LockDevice, "close", lambda *a: True)
+    monkeypatch.setattr(LockDevice, "gpio_setup", lambda *a: True)
+
+    device = LockDevice(syscfg)
+
+    main.start_app(app_config=syscfg,
+                   device=device)
