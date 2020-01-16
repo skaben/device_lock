@@ -187,7 +187,7 @@ class LockDevice(BaseDevice):
                                 self.check_id(self.result)
                             except Exception:
                                 if self.snd:
-                                    self.snd.play(sound='block', channel='fg')
+                                    self.snd.play(sound='denied', channel='fg')
                         else:
                             self.result += str(input_data)
                 elif input_type == 'CD':
@@ -200,11 +200,11 @@ class LockDevice(BaseDevice):
                 if input_type == 'KB':
                     if int(input_data) == 11:
                         if self.snd:
-                            self.snd.play('block', 'fg')
+                            self.snd.play('denied', 'fg')
                         self.set_closed()
                 elif input_type == 'CD':
                     if self.snd:
-                        self.snd.play('block', 'fg')
+                        self.snd.play('denied', 'fg')
                     self.serial_lock = True
                     self.set_closed()
 
@@ -215,7 +215,7 @@ class LockDevice(BaseDevice):
         logging.debug(f'checking id {_id}')
         if self.config.get('blocked'):
             if self.snd:
-                self.snd.play(sound='block', channel='fg')
+                self.snd.play(sound='denied', channel='fg')
                 return
 
         cards = self.config.get('card_list')
@@ -225,7 +225,7 @@ class LockDevice(BaseDevice):
                                'level': self.alert,
                                'comment': f'badcode {_id} (ACL empty)'})
             if self.snd:
-                self.snd.play(sound='block', channel='fg')
+                self.snd.play(sound='denied', channel='fg')
                 return
 
         current_acl = cards.split(';')
@@ -233,10 +233,12 @@ class LockDevice(BaseDevice):
             if not self.config.get('closed'):
                 self.set_closed(ident=_id)
             else:
+                if self.snd:
+                    self.snd.play(sound='granted', channel='fg')
                 self.set_opened(timer=True, ident=_id)
         else:
             if self.snd:
-                self.snd.play(sound='block', channel='fg')
+                self.snd.play(sound='denied', channel='fg')
             # sending alert
             event = make_event('device', 'send', {'message': 'alert',
                                                   'level': self.alert,
