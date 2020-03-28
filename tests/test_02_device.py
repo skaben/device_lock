@@ -49,11 +49,8 @@ def get_device(monkeypatch, get_config, default_config):
 
         devcfg = get_config(DeviceConfig, device_config_dict, 'device_conf.yml')
         devcfg.save()
-        _dev = {'device_conf': devcfg.config_path}
 
-        syscfg = get_config(SystemConfig,
-                            {**system_config_dict, **_dev},
-                            'system_conf.yml')
+        syscfg = get_config(SystemConfig, default_config('sys'), 'system_conf.yml')
 
         # monkey patch all GPIO operations by default
         monkeypatch.setattr(wpi, "wiringPiSetup", lambda x: True)
@@ -66,7 +63,7 @@ def get_device(monkeypatch, get_config, default_config):
         # disable sound
         monkeypatch.setattr(LockDevice, "_snd_init", lambda *args: None)
         # monkeypatch.setattr(LockDevice, "port", get_port_data)
-        device = LockDevice(syscfg)
+        device = LockDevice(syscfg, devcfg.config_path)
         return device, devcfg, syscfg
 
     return _inner
@@ -116,6 +113,7 @@ def test_device_close_simple(get_device, monkeypatch):
     assert res is not None, 'already closed, doing nothing'
     event = device.q_int.get()
     assert event == res
+
 
 def test_device_open_simple(get_device, monkeypatch):
     device, devcfg, syscfg = get_device()

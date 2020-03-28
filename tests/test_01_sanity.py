@@ -16,8 +16,6 @@ def test_app_integrity(get_config, get_root, default_config, monkeypatch):
     devcfg = get_config(DeviceConfig, default_config('dev'), dev_config_path)
     syscfg = get_config(SystemConfig, default_config('sys'), app_config_path)
 
-    syscfg.set('device_conf', devcfg.config_path)
-
     monkeypatch.setattr(main.EventRouter, "start", lambda *a: True)
     monkeypatch.setattr(main.EventRouter, "join", lambda *a: True)
     monkeypatch.setattr(main.MQTTClient, "start", lambda *a: True)
@@ -26,7 +24,7 @@ def test_app_integrity(get_config, get_root, default_config, monkeypatch):
     monkeypatch.setattr(LockDevice, "close", lambda *a: True)
     monkeypatch.setattr(LockDevice, "gpio_setup", lambda *a: True)
 
-    device = LockDevice(syscfg)
+    device = LockDevice(syscfg, devcfg.config_path)
 
     main.start_app(app_config=syscfg,
                    device=device)

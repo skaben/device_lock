@@ -10,6 +10,7 @@ import wiringpi as wpi
 from skabenclient.helpers import make_event
 from skabenclient.loaders import SoundLoader
 from skabenclient.device import BaseDevice
+from smart_lock.config import LockConfig
 
 try:
     pg.mixer.pre_init()
@@ -29,9 +30,10 @@ class LockDevice(BaseDevice):
     snd = None  # sound module
     closed = None
     running = None
+    config_class = LockConfig
 
-    def __init__(self, system_config):
-        super().__init__(system_config)
+    def __init__(self, system_config, device_config_path):
+        super().__init__(system_config, device_config_path)
         self.port = None
         self.keypad_data_queue = None
         self.keypad_thread = None
