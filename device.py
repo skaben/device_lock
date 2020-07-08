@@ -15,7 +15,7 @@ from smart_lock.config import LockConfig
 try:
     pg.mixer.pre_init()
 except Exception:
-    logging.exception('pre-init mixer failed')
+    logging.exception('pre-init mixer failed: ')
 
 # TODO: sound disable in status closed
 # TODO: sound by pin status, not by database
@@ -78,6 +78,9 @@ class LockDevice(BaseDevice):
                     if not self.snd.channels['bg'].get_busy():
                         self.snd.play(sound='field', channel='bg', loops=-1)
 
+            if self.config.get('blocked'):
+                continue
+
             if not self.config.get('closed'):
                 # close by timer
                 if self.check_timer(int(time.time())):
@@ -91,8 +94,6 @@ class LockDevice(BaseDevice):
             else:
                 time.sleep(.1)
 
-            if self.config.get('blocked'):
-                continue
         else:
             return self.stop()
 

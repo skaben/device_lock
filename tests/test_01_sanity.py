@@ -8,7 +8,7 @@ from smart_lock.device import LockDevice, wpi
 
 
 def test_app_integrity(get_config, get_root, default_config, monkeypatch):
-    """ Starting app test """
+    """ Starting skaben test """
 
     app_config_path = os.path.join(get_root, "res", "app_config.yml")
     dev_config_path = os.path.join(get_root, "res", "dev_config.yml")

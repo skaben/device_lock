@@ -8,14 +8,18 @@ from config import LockConfig
 
 root = os.path.abspath(os.path.dirname(__file__))
 
-app_config_path = os.path.join(root, 'conf', 'config.yml')
+sys_config_path = os.path.join(root, 'conf', 'system.yml')
 dev_config_path = os.path.join(root, 'conf', 'device.yml')
 log_path = os.path.join(root, 'local.log')
 
 if __name__ == "__main__":
-    app_config = SystemConfig(app_config_path)
+    # setting up system configuration and logger
+    app_config = SystemConfig(sys_config_path)
     app_config.logger(file_path=log_path)
-    device = LockDevice(app_config, dev_config_path)
+    # instantiating device
+    dev_config = LockConfig(dev_config_path)
+    device = LockDevice(app_config, dev_config)
+    # perform lock-specific actions on device
     device.gpio_setup()  # pins for laser control and serial interface for keypads
     device.close()  # turn on laser door, closing lock
 

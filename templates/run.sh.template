@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 source ${dirpath}/venv/bin/activate &&
-python ${dirpath}/app.py
+python ${dirpath}/skaben.py
