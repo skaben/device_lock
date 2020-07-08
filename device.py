@@ -106,7 +106,7 @@ class LockDevice(BaseDevice):
                     self.snd.enabled = True
                 else:
                     self.snd.enabled = None
-            if self.config.get('opened'):
+            if not self.config.get('closed'):
                 self.lock_timer = None  # drop timer
                 self.open()
             else:
