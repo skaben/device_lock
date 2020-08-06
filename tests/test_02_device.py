@@ -5,9 +5,11 @@ import pygame as pg
 import wiringpi as wpi
 
 from skabenclient.helpers import make_event
-from skabenclient.config import SystemConfig, DeviceConfig
+from skabenclient.config import SystemConfig
 from skabenclient.loaders import SoundLoader
-from smart_lock.device import LockDevice
+
+from ..device import LockDevice
+from ..config import LockConfig
 
 
 @pytest.fixture
@@ -47,10 +49,10 @@ def get_device(monkeypatch, get_config, default_config):
         if not system_config_dict:
             system_config_dict = default_config('sys')
 
-        devcfg = get_config(DeviceConfig, device_config_dict, 'device_conf.yml')
+        devcfg = get_config(LockConfig, device_config_dict, 'device_config.yml')
         devcfg.save()
 
-        syscfg = get_config(SystemConfig, default_config('sys'), 'system_conf.yml')
+        syscfg = get_config(SystemConfig, default_config('sys'), 'system_config.yml')
 
         # monkey patch all GPIO operations by default
         monkeypatch.setattr(wpi, "wiringPiSetup", lambda x: True)
@@ -63,7 +65,7 @@ def get_device(monkeypatch, get_config, default_config):
         # disable sound
         monkeypatch.setattr(LockDevice, "_snd_init", lambda *args: None)
         # monkeypatch.setattr(LockDevice, "port", get_port_data)
-        device = LockDevice(syscfg, devcfg.config_path)
+        device = LockDevice(syscfg, devcfg)
         return device, devcfg, syscfg
 
     return _inner
@@ -124,30 +126,31 @@ def test_device_open_simple(get_device, monkeypatch):
     event = device.q_int.get()
     assert event == res
 
+freezed_time = int(time.time())
 
 @pytest.mark.parametrize("now, timer, res", [
-    (0, 10, 10),
     (None, 100, 100),
-    (int(time.time()), 0, None),
+    (freezed_time, 0, freezed_time),
+    (freezed_time, 100, freezed_time + 100),
 ])
-def test_device_close(res, now, timer, get_device):
+def test_device_timer_close(res, now, timer, get_device):
     device, devcfg, syscfg = get_device()
     device.config = {'timer': timer}
-    timer_res = device.set_timer(now)
+    timer_res = device.set_main_timer(now)
 
-    assert timer_res == res
+    assert timer_res == str(res)
 
 
 @pytest.mark.parametrize("now, timer, chk, res", [
     (5, 10, 16, True),  # more than ETA, check success
     (5, 10, 14, None),  # less than ETA, check failed
-    (None, 100, 105, True),  # None as 0
+    (None, 100, 105, True),
 ])
 def test_device_timer_check(now, timer, chk, res, get_device):
     device, devcfg, syscfg = get_device()
     device.config = {'timer': timer}
-    device.set_timer(now)
-    timer_chk = device.check_timer(chk)
+    device.set_main_timer(now)
+    timer_chk = device.check_timer("main", chk)
 
     assert timer_chk == res
 

@@ -1,0 +1,40 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: SKABEN LOCK package
+
+on:
+  push:
+    branches: [ unstable ]
+
+jobs:
+  test:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Deploy lock
+      run: |
+        iface=$(ip route | grep "default" | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
+        local_path=$(pwd)
+        mkdir ./conf/
+        mkdir ./tests/res/
+        sed -e "s/\${iface}/'$iface'/" \
+            -e "s+\${dirpath}+$local_path+" "templates/system_config.yml.template" > "./conf/system_config.yml"
+        touch "./conf/device_config.yml"  # create empty device config
+    - name: Lint with flake8
+      run: |
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        pytest .
