@@ -1,7 +1,7 @@
 import os
 import yaml
 import pytest
-from smart_lock.config import LockConfig
+from ..config import LockConfig
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 

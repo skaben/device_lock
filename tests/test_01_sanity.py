@@ -6,8 +6,8 @@ from skabenclient.mqtt_client import MQTTClient
 from skabenclient.config import DeviceConfig, SystemConfig
 from skabenclient.main import start_app
 
-from smart_lock.config import LockConfig
-from smart_lock.device import LockDevice, wpi
+from ..config import LockConfig
+from ..device import LockDevice, wpi
 
 
 @pytest.mark.skip(reason="hanging process of unknown source")
