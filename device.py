@@ -27,12 +27,12 @@ class LockDevice(BaseDevice):
     running = None
     config_class = LockConfig
 
-    def __init__(self, system_config, device_config_path):
-        super().__init__(system_config, device_config_path)
+    def __init__(self, system_config, device_config):
+        super().__init__(system_config, device_config)
         self.port = None
         self.keypad_data_queue = None
         self.keypad_thread = None
-        self.unlock_attempts = []
+        self.timers = {}
         self.result = ''
         # set config values (without gorillas, bananas and jungles)
         self.pin = system_config.get('pin')
@@ -217,10 +217,9 @@ class LockDevice(BaseDevice):
 
     def new_timer(self, now: int, value: str, name: str) -> str:
         now = now or "0"
-        if int(value) <= 0:
-            new_value = 0
-        else:
-            new_value = int(now) + int(value)
+        if int(value) < 0:
+            value = 0
+        new_value = int(now) + int(value)
         self.timers.update({name: str(new_value)})
         return self.timers[name]
 
@@ -267,12 +266,14 @@ class LockDevice(BaseDevice):
             # logging.debug('get serial: {}'.format(data))
         except Exception:
             logging.exception(f'cannot decode serial: {serial_data}')
+            self.access_denied()
+            time.sleep(5)
 
         if data:
             input_type = data[2:4]  # keyboard or card
             input_data = str(data[4:]).strip()  # code entered/readed
             if self.serial_lock and input_data == 'CD':
-                time.sleep(1)
+                time.sleep(.5)
                 self.serial_lock = False
                 return
 

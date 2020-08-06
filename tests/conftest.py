@@ -1,7 +1,7 @@
 import os
 import yaml
 import pytest
-from skabenclient.config import SystemConfig
+from smart_lock.config import LockConfig
 
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
