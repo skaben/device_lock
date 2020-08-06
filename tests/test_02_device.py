@@ -8,8 +8,8 @@ from skabenclient.helpers import make_event
 from skabenclient.config import SystemConfig
 from skabenclient.loaders import SoundLoader
 
-from smart_lock.device import LockDevice
-from smart_lock.config import LockConfig
+from ..device import LockDevice
+from ..config import LockConfig
 
 
 @pytest.fixture
