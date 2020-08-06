@@ -27,6 +27,7 @@ jobs:
       run: |
         iface=$(ip route | grep "default" | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
         local_path=$(pwd)
+        mkdir ./conf/
         sed -e "s/\${iface}/'$iface'/" \
             -e "s+\${dirpath}+$local_path+" "templates/system_config.yml.template" > "./conf/system_config.yml"
         touch "./conf/device_config.yml"  # create empty device config
