@@ -64,7 +64,7 @@ class LockDevice(BaseDevice):
 
         while self.running:
             # main routine
-            if self.snd:
+            if self.config.get("sound") and self.snd:
                 self.manage_sound()
 
             if self.config.get('blocked'):
@@ -233,8 +233,6 @@ class LockDevice(BaseDevice):
         wpi.pinMode(self.pin, 1)
         wpi.digitalWrite(self.pin, 0)
         time.sleep(.5)
-        wpi.digitalWrite(self.pin, 1)
-        time.sleep(.1)
         while not self.port:
             try:
                 self.port = serial.Serial('/dev/ttyS1')
