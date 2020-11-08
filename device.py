@@ -64,10 +64,10 @@ class LockDevice(BaseDevice):
         acl = self.config.get("acl")
         self.logger.info(f"current ACL is {acl}")
 
-        if self.config.get("closed"):
-            self.set_closed()
+        if self.config.get("sound"):
+            self.snd.enabled = True
         else:
-            self.set_opened()
+            self.snd.enabled = None
 
         while self.running:
             # main routine
@@ -79,7 +79,7 @@ class LockDevice(BaseDevice):
 
             if not self.config.get('closed'):
                 # close by timer
-                if self.check_timer("main", time.time()):
+                if self.check_timer("main", int(time.time())):
                     self.set_closed()
 
             if not self.keypad_data_queue.empty():
@@ -144,8 +144,9 @@ class LockDevice(BaseDevice):
             if ident:
                 self.logger.info(f"[---] OPEN by {ident}")
                 payload["msg"] = ident
-            #if timer:
-            #    self.set_main_timer(int(time.time()))
+            if timer:
+                now = int(time.time())
+                self.set_main_timer(now)
             return self.state_update(payload)
 
     def set_closed(self, ident='system'):
@@ -198,7 +199,11 @@ class LockDevice(BaseDevice):
     def sound_off(self):
         if self.snd:
             self.logger.debug('sound OFF')
-            self.snd.fadeout(300)
+            try:
+                self.snd.fadeout(300)
+            except:
+                self.snd.stop()
+                self.snd.enabled = None
 
     def sound_on(self):
         if self.snd:
@@ -223,24 +228,30 @@ class LockDevice(BaseDevice):
                 self.snd.play(sound='field', channel='bg', loops=-1)
 
     def set_main_timer(self, now: int) -> str:
-        delay = self.config.get('timer', "0")
-        self.logger.debug('lock timer start counting {}s'.format(delay))
-        return self.new_timer(now, delay, "main")
+        delay = self.config.get('timer')
+        if delay:
+            self.logger.debug('lock timer start counting {}s'.format(delay))
+            return self.new_timer(now, delay, "main")
+        else:
+            self.logger.warning("no time interval for auto timer set! setting default 5 sec")
+            return self.new_timer(now, 5, "main")
 
     def new_timer(self, now: int, value: str, name: str) -> str:
-        now = now or "0"
         if int(value) < 0:
             value = 0
         new_value = int(now) + int(value)
         self.timers.update({name: str(new_value)})
+        self.logger.debug("timer set at {now} with name {name} to {value}s")
         return self.timers[name]
 
     def check_timer(self, name: str, now: int) -> bool:
-        now = now or "0"
-        timer = self.timers.get(name, "0")
-        if int(timer) and int(timer) <= int(now):
-            self.timers.update({name: "0"})
-            return True
+        timer = self.timers.get(name)
+        if not timer:
+            logger.error(f"no such timer {timer}")
+            return
+
+        if int(timer) <= int(now):
+            return self.timers.pop(name)
 
     def gpio_setup(self):
         """ Setup wiringpi GPIO """

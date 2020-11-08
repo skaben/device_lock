@@ -4,7 +4,8 @@ ESSENTIAL = {
     'closed': True,
     'sound': True,
     'blocked': False,
-    'acl': ['0000',],
+    'acl': ['0000', '1234'],
+    'timer': 1
 }
 
 
