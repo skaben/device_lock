@@ -143,7 +143,6 @@ class LockDevice(BaseDevice):
             payload = {"closed": False}
             if ident:
                 self.logger.info(f"[---] OPEN by {ident}")
-                payload["msg"] = ident
             if timer:
                 now = int(time.time())
                 self.set_main_timer(now)
