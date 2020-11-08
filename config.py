@@ -4,12 +4,12 @@ ESSENTIAL = {
     'closed': True,
     'sound': True,
     'blocked': False,
-    'card_list': [],
+    'acl': ['0000',],
 }
 
 
 class LockConfig(DeviceConfig):
 
-    def __init__(self, config):
+    def __init__(self, config_path):
         self.minimal_essential_conf = ESSENTIAL
-        super().__init__(config)
+        super().__init__(config_path)
