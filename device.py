@@ -157,7 +157,7 @@ class LockDevice(BaseDevice):
         if self.config.get('blocked'):
             return self.access_denied(code)
 
-        self.is_id_in_acl(code, self.config.get('card_list'))
+        self.is_id_in_acl(code, self.config.get('acl'))
         self.serial_lock = False
 
     def is_id_in_acl(self, code, acl):
@@ -165,12 +165,9 @@ class LockDevice(BaseDevice):
             logging.error('lock ACL is empty - no card codes in DB')
             return self.access_denied()
 
-        current_acl = acl.split(';')
-        if code in current_acl:
-            if not self.config.get('closed'):
-                return self.set_closed(ident=code)
-            else:
-                return self.access_granted(code)
+        current_acl = acl
+        if code in current_acl and not self.config.get('closed'):
+            return self.set_closed(ident=code)
         else:
             return self.access_denied(code)
 
@@ -196,7 +193,7 @@ class LockDevice(BaseDevice):
             logging.debug('sound ON')
             self.snd.enabled = True
         else:
-            # todo: report to server
+            self.send_message({"error": "sound module init failed"})
             logging.debug('sound module not initialized')
 
     def manage_sound(self):
