@@ -9,7 +9,7 @@ import wiringpi as wpi
 from skabenclient.helpers import make_event
 from skabenclient.loaders import SoundLoader
 from skabenclient.device import BaseDevice
-from .config import LockConfig
+from config import LockConfig
 
 try:
     pg.mixer.pre_init()
