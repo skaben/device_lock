@@ -8,6 +8,7 @@ from ..config import LockConfig
 from skabenclient.config import SystemConfig
 
 
+
 root_dir = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -153,6 +154,7 @@ def get_device(request, monkeypatch, get_config, default_config):
 @pytest.fixture
 def get_port_data():
 
+
     def _dec(data):
         filepath = os.path.join('tests', 'res', 'portdata')
         with open(filepath, 'rw') as fh:
@@ -192,3 +194,6 @@ def device_run(request):
 
         request.addfinalizer(_td)
         return result
+
+    return _wrap
+
