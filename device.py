@@ -246,7 +246,7 @@ class LockDevice(BaseDevice):
     def check_timer(self, name: str, now: int) -> bool:
         timer = self.timers.get(name)
         if not timer:
-            logger.error(f"no such timer {timer}")
+            self.logger.error(f"no such timer {timer}")
             return
 
         if int(timer) <= int(now):
