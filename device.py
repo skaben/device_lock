@@ -100,7 +100,7 @@ class LockDevice(BaseDevice):
             if self.snd:
                 self.snd.enabled = self.config.get('sound')
             if not self.config.get('closed'):
-                self.timers['main'] = 0  # drop timer
+                self.timers = {}
                 self.open()
             else:
                 self.close()
@@ -140,13 +140,12 @@ class LockDevice(BaseDevice):
         # open from user input
         op = self.open()
         if op:
-            payload = {"closed": False}
             if ident:
                 self.logger.info(f"[---] OPEN by {ident}")
             if timer:
                 now = int(time.time())
                 self.set_main_timer(now)
-            return self.state_update(payload)
+            return self.state_update({"closed": False})
 
     def set_closed(self, ident='system'):
         """ Wrapper for close operation """
@@ -154,8 +153,7 @@ class LockDevice(BaseDevice):
         op = self.close()
         if op:
             self.logger.info(f"[---] CLOSE by {ident}")
-            return self.state_update({'closed': True,
-                                      'msg': f'{ident}'})
+            return self.state_update({'closed': True})
 
     def check_id(self, _id):
         """ Check id (code or card number) """
@@ -232,16 +230,16 @@ class LockDevice(BaseDevice):
             self.logger.debug('lock timer start counting {}s'.format(delay))
             return self.new_timer(now, delay, "main")
         else:
-            self.logger.warning("no time interval for auto timer set! setting default 5 sec")
-            return self.new_timer(now, 5, "main")
+            self.logger.error("no time interval for auto timer set! check config.")
 
     def new_timer(self, now: int, value: str, name: str) -> str:
-        if int(value) < 0:
-            value = 0
-        new_value = int(now) + int(value)
-        self.timers.update({name: str(new_value)})
-        self.logger.debug("timer set at {now} with name {name} to {value}s")
-        return self.timers[name]
+        if int(value) > 0:
+            new_value = int(now) + int(value)
+            self.timers.update({name: new_value})
+            self.logger.debug(f"timer set at {now} with name {name} to {value}s")
+            return self.timers[name]
+        else:
+            self.logger.debug(f"timer set too close: {value} < 0")
 
     def check_timer(self, name: str, now: int) -> bool:
         timer = self.timers.get(name)
