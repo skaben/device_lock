@@ -1,4 +1,3 @@
-import logging
 import pygame as pg
 import serial
 import time
@@ -14,7 +13,7 @@ from config import LockConfig
 try:
     pg.mixer.pre_init()
 except Exception:
-    logging.exception('pre-init mixer failed: ')
+    self.logger.exception('pre-init mixer failed: ')
 
 
 class LockDevice(BaseDevice):
@@ -22,9 +21,10 @@ class LockDevice(BaseDevice):
     """ Smart Lock device handler """
 
     serial_lock = None
-    snd = None  # sound module
+    snd = None # sound module
     closed = None
     running = None
+    unlock_attempts = []
     config_class = LockConfig
 
     def __init__(self, system_config, device_config):
@@ -49,10 +49,10 @@ class LockDevice(BaseDevice):
             try:
                 self.gpio_setup()
             except Exception as e:
-                logging.exception(f'gpio_setup failed, cannot start device:\n{e}')
+                self.logger.exception(f'gpio_setup failed, cannot start device:\n{e}')
                 raise
 
-        logging.info('running lock...')
+        self.logger.info('running lock...')
         self.running = True
         self.keypad_data_queue = Queue()
         self.keypad_thread = th.Thread(target=self._serial_read,
@@ -61,6 +61,13 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
+        acl = self.config.get("acl")
+        self.logger.info(f"current ACL is {acl}")
+
+        if self.config.get("closed"):
+            self.set_closed()
+        else:
+            self.set_opened()
 
         while self.running:
             # main routine
@@ -98,7 +105,7 @@ class LockDevice(BaseDevice):
             else:
                 self.close()
         except Exception:
-            logging.exception('lock operation error')
+            self.logger.exception('lock operation error')
 
     def stop(self):
         """ Full stop """
@@ -123,7 +130,7 @@ class LockDevice(BaseDevice):
         if not self.closed:
             if self.snd:
                 self.snd.play(sound='on', channel='fg', delay=.5)
-                # self.snd.play(sound='field', channel='bg', delay=1, loops=-1, fade_ms=1200)
+                self.snd.play(sound='field', channel='bg', delay=1, loops=-1, fade_ms=1200)
             wpi.digitalWrite(self.pin, 1)
             self.closed = True  # state of GPIO
             return 'close lock'
@@ -135,9 +142,10 @@ class LockDevice(BaseDevice):
         if op:
             payload = {"closed": False}
             if ident:
+                self.logger.info(f"[---] OPEN by {ident}")
                 payload["msg"] = ident
-            if timer:
-                self.set_main_timer(int(time.time()))
+            #if timer:
+            #    self.set_main_timer(int(time.time()))
             return self.state_update(payload)
 
     def set_closed(self, ident='system'):
@@ -145,6 +153,7 @@ class LockDevice(BaseDevice):
         # closed from user input
         op = self.close()
         if op:
+            self.logger.info(f"[---] CLOSE by {ident}")
             return self.state_update({'closed': True,
                                       'msg': f'{ident}'})
 
@@ -152,7 +161,7 @@ class LockDevice(BaseDevice):
         """ Check id (code or card number) """
         self.result = ''  # additional clearing point
         code = str(_id).lower()
-        logging.debug(f'checking id {code}')
+        self.logger.debug(f'checking id {code}')
 
         if self.config.get('blocked'):
             return self.access_denied(code)
@@ -162,12 +171,14 @@ class LockDevice(BaseDevice):
 
     def is_id_in_acl(self, code, acl):
         if not acl:
-            logging.error('lock ACL is empty - no card codes in DB')
+            self.logger.error('lock ACL is empty - no card codes in DB')
             return self.access_denied()
-
-        current_acl = acl
-        if code in current_acl and not self.config.get('closed'):
-            return self.set_closed(ident=code)
+        closed = self.config.get("closed")
+        if code in acl:
+            if closed:
+                return self.access_granted(code)
+            else:
+                return self.set_closed(ident=code)
         else:
             return self.access_denied(code)
 
@@ -175,6 +186,7 @@ class LockDevice(BaseDevice):
         if self.snd:
             self.snd.play(sound='denied', channel='fg')
         if code:
+            self.logger.info(f"[---] DENIED to {code}")
             self.unlock_attempts.append(code)
         time.sleep(.3)
 
@@ -185,22 +197,25 @@ class LockDevice(BaseDevice):
 
     def sound_off(self):
         if self.snd:
-            logging.debug('sound OFF')
+            self.logger.debug('sound OFF')
             self.snd.fadeout(300)
 
     def sound_on(self):
         if self.snd:
-            logging.debug('sound ON')
+            self.logger.debug('sound ON')
             self.snd.enabled = True
         else:
             self.send_message({"error": "sound module init failed"})
-            logging.debug('sound module not initialized')
+            self.logger.debug('sound module not initialized')
 
     def manage_sound(self):
-        if self.config.get('sound') and not self.snd.enabled:
+        sound = self.config.get("sound")
+        if sound and not self.snd.enabled:
             self.sound_on()
-        elif not self.config.get('sound') and self.snd.enabled:
+        elif not sound and self.snd.enabled:
             self.sound_off()
+        else:
+            return
 
         if self.config.get('closed'):
             # play field sound without interrupts
@@ -209,7 +224,7 @@ class LockDevice(BaseDevice):
 
     def set_main_timer(self, now: int) -> str:
         delay = self.config.get('timer', "0")
-        logging.debug('lock timer start counting {}s'.format(delay))
+        self.logger.debug('lock timer start counting {}s'.format(delay))
         return self.new_timer(now, delay, "main")
 
     def new_timer(self, now: int, value: str, name: str) -> str:
@@ -233,23 +248,21 @@ class LockDevice(BaseDevice):
         wpi.pinMode(self.pin, 1)
         wpi.digitalWrite(self.pin, 0)
         time.sleep(.5)
-        wpi.digitalWrite(self.pin, 1)
-        time.sleep(.1)
         while not self.port:
             try:
                 self.port = serial.Serial('/dev/ttyS1')
                 self.port.baudrate = 9600
-                logging.debug("Connected to /dev/ttyS1")
+                self.logger.debug("Connected to /dev/ttyS1")
             except Exception:
                 try:
                     self.port = serial.Serial('/dev/ttyAMA1')
                     self.port.baudrate = 9600
                 except Exception:
-                    logging.exception('cannot connect serial!')
+                    self.logger.exception('cannot connect serial!')
                 else:
-                    logging.debug("Connected to /dev/ttyAMA1")
+                    self.logger.debug("Connected to /dev/ttyAMA1")
             else:
-                logging.debug('failed to connect to serial')
+                self.logger.debug('failed to connect to serial')
             finally:
                 time.sleep(.5)
         return self.port
@@ -260,9 +273,9 @@ class LockDevice(BaseDevice):
 
         try:
             data = serial_data.decode('utf-8')
-            # logging.debug('get serial: {}'.format(data))
+            # self.logger.debug('get serial: {}'.format(data))
         except Exception:
-            logging.exception(f'cannot decode serial: {serial_data}')
+            self.logger.exception(f'cannot decode serial: {serial_data}')
             self.access_denied()
             time.sleep(5)
 
@@ -308,7 +321,7 @@ class LockDevice(BaseDevice):
                     self.set_closed()
 
     def _serial_read(self, port, queue):
-        logging.debug('start listening serial: {}'.format(port))
+        self.logger.debug('start listening serial: {}'.format(port))
         while self.running:
             # serial_data = wpi.serialGetchar(port)
             serial_data = port.readline()
@@ -321,6 +334,6 @@ class LockDevice(BaseDevice):
         try:
             snd = SoundLoader(sound_dir=sound_dir)
         except Exception:
-            logging.exception('failed to initialize sound module')
+            self.logger.exception('failed to initialize sound module')
             snd = None
         return snd
