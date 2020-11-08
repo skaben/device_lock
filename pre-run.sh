@@ -100,7 +100,7 @@ reset ()
   iface=$(ip route | grep "default" | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
   local_path=$(pwd)
   sed -e "s/\${iface}/'$iface'/" \
-      -e "s+\${dirpath}+$local_path+" "templates/system_config.yml.template" > "./conf/system.yml"
+      -e "s+\${dirpath}+$local_path+" "templates/system.yml.template" > "./conf/system.yml"
   touch "./conf/device.yml"  # create empty device config
   unpack_resources
   lock_info
