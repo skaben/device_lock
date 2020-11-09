@@ -241,11 +241,7 @@ class LockDevice(BaseDevice):
 
     def check_timer(self, name: str, now: int) -> bool:
         timer = self.timers.get(name)
-        if not timer:
-            self.logger.error(f"no such timer {timer}")
-            return
-
-        if int(timer) <= int(now):
+        if timer and int(timer) <= int(now):
             return self.timers.pop(name)
 
     def gpio_setup(self):
