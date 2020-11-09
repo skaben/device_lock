@@ -63,9 +63,12 @@ class LockDevice(BaseDevice):
                                        name='serial read Thread',
                                        args=(self.port, self.keypad_data_queue,))
         self.keypad_thread.start()
-        start_event = make_event('device', 'reload')
-        self.q_int.put(start_event)
+        # temp solution
+        # todo: unstable
+        # start_event = make_event('device', 'reload')
+        # self.q_int.put(start_event)
         self.reset()
+        self.set_closed()
 
         while self.running:
             # main routine

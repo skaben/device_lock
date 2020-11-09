@@ -21,7 +21,6 @@ if __name__ == "__main__":
     device = LockDevice(app_config, dev_config)
     # perform lock-specific actions on device
     device.gpio_setup()  # pins for laser control and serial interface for keypads
-    device.close()  # turn on laser door, closing lock
 
     start_app(app_config=app_config,
               device=device)
