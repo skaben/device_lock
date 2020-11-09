@@ -119,7 +119,8 @@ class LockDevice(BaseDevice):
         if self.closed:
             if self.snd:
                 self.snd.fadeout(SOUND_FADEOUT * 4, 'bg')
-                self.snd.play(sound='off', channel='fg', delay=DEFAULT_SLEEP * 3)
+                self.snd.play(sound='off', channel='fg', delay=SOUND_FADEOUT * 3)
+            time.sleep(DEFAULT_SLEEP * 2)
             wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
@@ -131,8 +132,9 @@ class LockDevice(BaseDevice):
         """Close lock low-level operation"""
         if not self.closed:
             if self.snd:
-                self.snd.play(sound='on', channel='fg', delay=DEFAULT_SLEEP)
-                self.snd.play(sound='field', channel='bg', delay=DEFAULT_SLEEP * 2, loops=-1, fade_ms=SOUND_FADEOUT * 4)
+                self.snd.play(sound='on', channel='fg')
+                self.snd.play(sound='field', channel='bg', delay=SOUND_FADEOUT, loops=-1, fade_ms=SOUND_FADEOUT * 4)
+            time.sleep(DEFAULT_SLEEP * 2)
             wpi.digitalWrite(self.pin, True)
             self.closed = True  # state of GPIO
             return 'close lock'
