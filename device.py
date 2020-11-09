@@ -65,7 +65,7 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
-        time.sleep(DEFAULT_SLEEP * 2)
+        self.reset()
 
         while self.running:
             # main routine
@@ -99,7 +99,7 @@ class LockDevice(BaseDevice):
             if self.snd:
                 self.snd.enabled = self.config.get('sound')
             if not self.config.get('closed'):
-                self.timers['main'] = 0  # drop timer
+                self.timers = {}  # drop timer
                 self.open()
             else:
                 self.close()
