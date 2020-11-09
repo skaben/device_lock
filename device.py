@@ -63,11 +63,8 @@ class LockDevice(BaseDevice):
                                        name='serial read Thread',
                                        args=(self.port, self.keypad_data_queue,))
         self.keypad_thread.start()
-        # temp solution
-        # todo: unstable
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
-        self.set_closed()
         self.reset()
 
         while self.running:
@@ -119,8 +116,7 @@ class LockDevice(BaseDevice):
         if self.closed:
             if self.snd:
                 self.snd.fadeout(SOUND_FADEOUT * 4, 'bg')
-                self.snd.play(sound='off', channel='fg', delay=SOUND_FADEOUT * 3)
-            time.sleep(DEFAULT_SLEEP * 2)
+                self.snd.play(sound='off', channel='fg', delay=DEFAULT_SLEEP * 3)
             wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
@@ -132,9 +128,8 @@ class LockDevice(BaseDevice):
         """Close lock low-level operation"""
         if not self.closed:
             if self.snd:
-                self.snd.play(sound='on', channel='fg')
-                self.snd.play(sound='field', channel='bg', delay=SOUND_FADEOUT, loops=-1, fade_ms=SOUND_FADEOUT * 4)
-            time.sleep(DEFAULT_SLEEP * 2)
+                self.snd.play(sound='on', channel='fg', delay=DEFAULT_SLEEP)
+                self.snd.play(sound='field', channel='bg', delay=DEFAULT_SLEEP * 2, loops=-1, fade_ms=SOUND_FADEOUT * 4)
             wpi.digitalWrite(self.pin, True)
             self.closed = True  # state of GPIO
             return 'close lock'
@@ -274,7 +269,7 @@ class LockDevice(BaseDevice):
                 time.sleep(DEFAULT_SLEEP)
         return self.port
 
-    def parse_data(self, serial_data: str):
+    def parse_data(self, serial_data):
         """ Parse data from keypad """
         data = None
 
@@ -327,7 +322,7 @@ class LockDevice(BaseDevice):
                     self.serial_lock = True
                     self.set_closed()
 
-    def _serial_read(self, port: serial.Serial, queue: Queue):
+    def _serial_read(self, port, queue):
         self.logger.debug('start listening serial: {}'.format(port))
         while self.running:
             # serial_data = wpi.serialGetchar(port)
@@ -340,7 +335,7 @@ class LockDevice(BaseDevice):
     def _serial_clean(self):
         self.result = ''
 
-    def _snd_init(self, sound_dir: str) -> SoundLoader:
+    def _snd_init(self, sound_dir):
         try:
             snd = SoundLoader(sound_dir=sound_dir)
         except Exception:
