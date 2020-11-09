@@ -65,8 +65,8 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         # temp solution
         # todo: unstable
-        # start_event = make_event('device', 'reload')
-        # self.q_int.put(start_event)
+        start_event = make_event('device', 'reload')
+        self.q_int.put(start_event)
         self.set_closed()
         self.reset()
 
