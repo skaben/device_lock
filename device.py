@@ -65,6 +65,7 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
+        self.set_closed()
         self.reset()
 
         while self.running:
@@ -117,6 +118,7 @@ class LockDevice(BaseDevice):
             if self.snd:
                 self.snd.fadeout(SOUND_FADEOUT * 4, 'bg')
                 self.snd.play(sound='off', channel='fg', delay=DEFAULT_SLEEP * 3)
+            time.sleep(DEFAULT_SLEEP * 2)
             wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
