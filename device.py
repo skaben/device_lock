@@ -142,7 +142,7 @@ class LockDevice(BaseDevice):
             if timer:
                 now = int(time.time())
                 self.set_main_timer(now)
-            return self.state_update(payload)
+            return self.state_update({"closed": False})
 
     def set_closed(self, code='system'):
         """Close lock with config update"""
@@ -236,7 +236,7 @@ class LockDevice(BaseDevice):
             value = 0
         new_value = int(now) + int(value)
         self.timers.update({name: str(new_value)})
-        self.logger.debug("timer set at {now} with name {name} to {value}s")
+        self.logger.debug(f"timer set at {now} with name {name} to {value}s")
         return self.timers[name]
 
     def check_timer(self, name: str, now: int) -> bool:
