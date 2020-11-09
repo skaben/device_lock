@@ -93,7 +93,7 @@ class LockDevice(BaseDevice):
 
     def reset(self):
         """ Resetting from saved config """
-        super().reset()
+        #super().reset()
         self.logger.debug(f"running with config: {self.config.data}")
         try:
             if self.snd:
