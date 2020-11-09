@@ -16,12 +16,17 @@ except Exception:
     self.logger.exception('pre-init mixer failed: ')
 
 
+DEFAULT_SLEEP = .5  # 500ms
+SOUND_FADEOUT = 300  # 300ms
+
+
 class LockDevice(BaseDevice):
 
     """ Smart Lock device handler """
 
+    result = ''  # read from serial
     serial_lock = None
-    snd = None # sound module
+    snd = None  # sound module
     closed = None
     running = None
     unlock_attempts = []
@@ -33,7 +38,6 @@ class LockDevice(BaseDevice):
         self.keypad_data_queue = None
         self.keypad_thread = None
         self.timers = {}
-        self.result = ''
         # set config values (without gorillas, bananas and jungles)
         self.pin = system_config.get('pin')
         self.alert = system_config.get('alert')
@@ -61,13 +65,8 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
-        acl = self.config.get("acl")
-        self.logger.info(f"current ACL is {acl}")
-
-        if self.config.get("sound"):
-            self.snd.enabled = True
-        else:
-            self.snd.enabled = None
+        self.set_closed()
+        self.reset()
 
         while self.running:
             # main routine
@@ -88,19 +87,20 @@ class LockDevice(BaseDevice):
                 if data:
                     self.parse_data(data)
             else:
-                time.sleep(.1)
+                time.sleep(DEFAULT_SLEEP / 5)
 
         else:
             return self.stop()
 
     def reset(self):
         """ Resetting from saved config """
-        super().reset()
+        #super().reset()
+        self.logger.debug(f"running with config: {self.config.data}")
         try:
             if self.snd:
                 self.snd.enabled = self.config.get('sound')
             if not self.config.get('closed'):
-                self.timers = {}
+                self.timers = {}  # drop timer
                 self.open()
             else:
                 self.close()
@@ -113,12 +113,13 @@ class LockDevice(BaseDevice):
         raise SystemExit
 
     def open(self):
-        """ Open lock """
+        """Open lock low-level operation"""
         if self.closed:
             if self.snd:
-                self.snd.fadeout(1200, 'bg')
-                self.snd.play(sound='off', channel='fg', delay=1.5)
-            wpi.digitalWrite(self.pin, 0)
+                self.snd.fadeout(SOUND_FADEOUT * 4, 'bg')
+                self.snd.play(sound='off', channel='fg', delay=DEFAULT_SLEEP * 3)
+            time.sleep(DEFAULT_SLEEP * 2)
+            wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
             if self.snd:
@@ -126,79 +127,76 @@ class LockDevice(BaseDevice):
             return 'open lock'
 
     def close(self):
-        """ Close lock """
+        """Close lock low-level operation"""
         if not self.closed:
             if self.snd:
-                self.snd.play(sound='on', channel='fg', delay=.5)
-                self.snd.play(sound='field', channel='bg', delay=1, loops=-1, fade_ms=1200)
-            wpi.digitalWrite(self.pin, 1)
+                self.snd.play(sound='on', channel='fg', delay=DEFAULT_SLEEP)
+                self.snd.play(sound='field', channel='bg', delay=DEFAULT_SLEEP * 2, loops=-1, fade_ms=SOUND_FADEOUT * 4)
+            wpi.digitalWrite(self.pin, True)
             self.closed = True  # state of GPIO
             return 'close lock'
 
-    def set_opened(self, timer=None, ident=None):
-        """ Wrapper for open operation """
-        # open from user input
-        op = self.open()
-        if op:
-            if ident:
-                self.logger.info(f"[---] OPEN by {ident}")
+    def set_opened(self, timer=None, code=None):
+        """Open lock with config update and timer"""
+        if self.open():
+            if code:
+                self.logger.info(f"[---] OPEN by {code}")
             if timer:
                 now = int(time.time())
                 self.set_main_timer(now)
             return self.state_update({"closed": False})
 
-    def set_closed(self, ident='system'):
-        """ Wrapper for close operation """
-        # closed from user input
-        op = self.close()
-        if op:
-            self.logger.info(f"[---] CLOSE by {ident}")
+    def set_closed(self, code='system'):
+        """Close lock with config update"""
+        if self.close():
+            self.logger.info(f"[---] CLOSE by {code}")
             return self.state_update({'closed': True})
 
-    def check_id(self, _id):
-        """ Check id (code or card number) """
-        self.result = ''  # additional clearing point
-        code = str(_id).lower()
-        self.logger.debug(f'checking id {code}')
-
-        if self.config.get('blocked'):
-            return self.access_denied(code)
-
-        self.is_id_in_acl(code, self.config.get('acl'))
-        self.serial_lock = False
-
-    def is_id_in_acl(self, code, acl):
-        if not acl:
-            self.logger.error('lock ACL is empty - no card codes in DB')
-            return self.access_denied()
-        closed = self.config.get("closed")
-        if code in acl:
-            if closed:
-                return self.access_granted(code)
-            else:
-                return self.set_closed(ident=code)
-        else:
-            return self.access_denied(code)
+    def access_granted(self, code):
+        """lock user interaction access granted"""
+        if self.snd:
+            self.snd.play(sound='granted', channel='fg')
+        # self.send_message({"message": f"{code} granted"})
+        return self.set_opened(timer=True, code=code)
 
     def access_denied(self, code=None):
+        """lock user interaction access denied"""
         if self.snd:
             self.snd.play(sound='denied', channel='fg')
         if code:
             self.logger.info(f"[---] DENIED to {code}")
+            # self.send_message({"message": f"{code} denied"})
             self.unlock_attempts.append(code)
-        time.sleep(.3)
+        time.sleep(DEFAULT_SLEEP)
 
-    def access_granted(self, code):
-        if self.snd:
-            self.snd.play(sound='granted', channel='fg')
-        return self.set_opened(timer=True, ident=code)
+    def check_id(self, _id):
+        """ Check id (code or card number) """
+        code = str(_id).lower()
+        self.logger.debug(f'checking id {code}')
+        # in blocked state lock should deny everything
+        if self.config.get('blocked'):
+            return self.access_denied(code)
+        # in opened state lock should close on every code
+        if not self.config.get('closed'):
+            return self.set_closed(code)
+        return self.is_id_in_acl(code, self.config.get('acl'))
+
+    def is_id_in_acl(self, code: str, acl: list):
+        if not acl:
+            self.logger.error('lock ACL is empty - no card codes in DB')
+            return self.access_denied()
+
+        if code in acl:
+            return self.access_granted(code)
+        else:
+            return self.access_denied(code)
 
     def sound_off(self):
         if self.snd:
             self.logger.debug('sound OFF')
             try:
-                self.snd.fadeout(300)
-            except:
+                self.snd.fadeout(SOUND_FADEOUT)
+            except Exception:
                 self.snd.stop()
                 self.snd.enabled = None
 
@@ -224,6 +222,8 @@ class LockDevice(BaseDevice):
             if not self.snd.channels['bg'].get_busy():
                 self.snd.play(sound='field', channel='bg', loops=-1)
 
+    # TODO: all timer logic should go to core
+
     def set_main_timer(self, now: int) -> str:
         delay = self.config.get('timer')
         if delay:
@@ -234,20 +234,14 @@ class LockDevice(BaseDevice):
 
     def new_timer(self, now: int, value: str, name: str) -> str:
         if int(value) > 0:
-            new_value = int(now) + int(value)
-            self.timers.update({name: new_value})
-            self.logger.debug(f"timer set at {now} with name {name} to {value}s")
-            return self.timers[name]
-        else:
-            self.logger.debug(f"timer set too close: {value} < 0")
+          new_value = int(now) + int(value)
+          self.timers.update({name: str(new_value)})
+          self.logger.debug(f"timer set at {now} with name {name} to {value}s")
+          return self.timers[name]
 
     def check_timer(self, name: str, now: int) -> bool:
         timer = self.timers.get(name)
-        if not timer:
-            self.logger.error(f"no such timer {timer}")
-            return
-
-        if int(timer) <= int(now):
+        if timer and int(timer) <= int(now):
             return self.timers.pop(name)
 
     def gpio_setup(self):
@@ -255,7 +249,7 @@ class LockDevice(BaseDevice):
         wpi.wiringPiSetup()
         wpi.pinMode(self.pin, 1)
         wpi.digitalWrite(self.pin, 0)
-        time.sleep(.5)
+        time.sleep(DEFAULT_SLEEP)
         while not self.port:
             try:
                 self.port = serial.Serial('/dev/ttyS1')
@@ -272,7 +266,7 @@ class LockDevice(BaseDevice):
             else:
                 self.logger.debug('failed to connect to serial')
             finally:
-                time.sleep(.5)
+                time.sleep(DEFAULT_SLEEP)
         return self.port
 
     def parse_data(self, serial_data):
@@ -285,13 +279,13 @@ class LockDevice(BaseDevice):
         except Exception:
             self.logger.exception(f'cannot decode serial: {serial_data}')
             self.access_denied()
-            time.sleep(5)
+            time.sleep(DEFAULT_SLEEP * 10)
 
         if data:
             input_type = data[2:4]  # keyboard or card
             input_data = str(data[4:]).strip()  # code entered/readed
             if self.serial_lock and input_data == 'CD':
-                time.sleep(.5)
+                time.sleep(DEFAULT_SLEEP)
                 self.serial_lock = False
                 return
 
@@ -300,7 +294,7 @@ class LockDevice(BaseDevice):
                 # keyboard event registered
                 if input_type == 'KB':
                     if int(input_data) == 10:
-                        self.result = ''
+                        self._serial_clean()
                     else:
                         if int(input_data) == 11:
                             try:
@@ -314,7 +308,7 @@ class LockDevice(BaseDevice):
                     self.serial_lock = True
                     # card action registered
                     self.check_id(input_data)
-                    self.result = ''
+                    self._serial_clean()
             else:
                 # lock OPENED
                 if input_type == 'KB':
@@ -336,7 +330,10 @@ class LockDevice(BaseDevice):
             if serial_data:
                 queue.put(serial_data)
             else:
-                time.sleep(.1)
+                time.sleep(DEFAULT_SLEEP / 5)
+
+    def _serial_clean(self):
+        self.result = ''
 
     def _snd_init(self, sound_dir):
         try:
