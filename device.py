@@ -230,16 +230,14 @@ class LockDevice(BaseDevice):
             self.logger.debug('lock timer start counting {}s'.format(delay))
             return self.new_timer(now, delay, "main")
         else:
-            self.logger.warning("no time interval for auto timer set! setting default 5 sec")
-            return self.new_timer(now, 5, "main")
+            self.logger.error("no time interval for auto timer set! check config.")
 
     def new_timer(self, now: int, value: str, name: str) -> str:
-        if int(value) < 0:
-            value = 0
-        new_value = int(now) + int(value)
-        self.timers.update({name: str(new_value)})
-        self.logger.debug(f"timer set at {now} with name {name} to {value}s")
-        return self.timers[name]
+        if int(value) > 0:
+          new_value = int(now) + int(value)
+          self.timers.update({name: str(new_value)})
+          self.logger.debug(f"timer set at {now} with name {name} to {value}s")
+          return self.timers[name]
 
     def check_timer(self, name: str, now: int) -> bool:
         timer = self.timers.get(name)
