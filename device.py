@@ -67,8 +67,8 @@ class LockDevice(BaseDevice):
         # todo: unstable
         # start_event = make_event('device', 'reload')
         # self.q_int.put(start_event)
-        self.reset()
         self.set_closed()
+        self.reset()
 
         while self.running:
             # main routine
