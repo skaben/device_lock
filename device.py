@@ -65,13 +65,7 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
-
-        self.logger.debug(f"running with config: {self.config.data}")
-
-        if self.config.get("sound"):
-            self.snd.enabled = True
-        else:
-            self.snd.enabled = None
+        time.sleep(DEFAULT_SLEEP * 2)
 
         while self.running:
             # main routine
@@ -100,6 +94,7 @@ class LockDevice(BaseDevice):
     def reset(self):
         """ Resetting from saved config """
         super().reset()
+        self.logger.debug(f"running with config: {self.config.data}")
         try:
             if self.snd:
                 self.snd.enabled = self.config.get('sound')
