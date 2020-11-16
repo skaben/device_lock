@@ -77,6 +77,9 @@ deploy () {
 
   echo -e "> installing dependencies with apt"
   sudo apt-get install -y --no-install-recommends $PYTHON $PYTHON_VENV $PYTHON_DEV
+  
+  echo -e "> installing dependencies for pygame >= 2.0.0"
+  sudo apt-get install -y libsdl2-dev libsdl2-ttf-2.0 libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev
 
   echo -e "> setting up virtual environment"
   delete_if_exists "venv"
