@@ -1,8 +1,8 @@
 --index-url https://pypi.fury.io/zerthmonk/
 --extra-index-url https://pypi.org/simple/
 
-skabenproto
-skabenclient==1.13
+skabenproto>=1.18
+skabenclient>=1.16
 pygame>=1.9.4
 pyaml==18.11.0
 pyserial==3.4
