@@ -30,7 +30,7 @@ jobs:
         mkdir ./conf/
         mkdir ./tests/res/
         sed -e "s/\${iface}/'$iface'/" \
-            -e "s+\${dirpath}+$local_path+" "templates/system.yml.template" > "./conf/system_config.yml"
+            -e "s+\${dirpath}+$local_path+" "templates/system.yml.template" > "./conf/system.yml"
         touch "./conf/device.yml"  # create empty device config
     - name: Lint with flake8
       run: |
