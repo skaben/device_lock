@@ -6,4 +6,5 @@ skabenclient>=1.16
 pygame>=1.9.4
 pyaml>=18.11.0
 pyserial>=3.4
+requests>=2.25
 wiringpi
