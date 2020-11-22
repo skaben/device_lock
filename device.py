@@ -2,12 +2,15 @@ import pygame as pg
 import serial
 import time
 import threading as th
+
+from typing import Union, Optional
 from queue import Queue
 
 import wiringpi as wpi
 from skabenclient.helpers import make_event
 from skabenclient.loaders import SoundLoader
 from skabenclient.device import BaseDevice
+from skabenclient.config import SystemConfig
 from config import LockConfig
 
 try:
@@ -32,7 +35,7 @@ class LockDevice(BaseDevice):
     unlock_attempts = []
     config_class = LockConfig
 
-    def __init__(self, system_config, device_config):
+    def __init__(self, system_config: SystemConfig, device_config: LockConfig):
         super().__init__(system_config, device_config)
         self.port = None
         self.keypad_data_queue = None
@@ -44,11 +47,8 @@ class LockDevice(BaseDevice):
         # set sound
         self.snd = self._snd_init(system_config.get('sound_dir'))
 
-    def run(self):
-        """ Running lock
-
-            self.gpio_setup() must be performed before run
-        """
+    def on_start(self):
+        """initialize serial listener, reload device"""
         if not self.port:
             try:
                 self.gpio_setup()
@@ -56,22 +56,27 @@ class LockDevice(BaseDevice):
                 self.logger.exception(f'gpio_setup failed, cannot start device:\n{e}')
                 raise
 
-        self.logger.info('running lock...')
-        self.running = True
         self.keypad_data_queue = Queue()
         self.keypad_thread = th.Thread(target=self._serial_read,
                                        name='serial read Thread',
                                        args=(self.port, self.keypad_data_queue,))
         self.keypad_thread.start()
+        self.set_closed()
+
+    def run(self):
+        """ Running lock
+
+            self.gpio_setup() must be performed before run
+        """
+        self.on_start()
+        self.logger.info('running lock...')
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
-        self.set_closed()
-        self.reset()
+        self.running = True
 
         while self.running:
             # main routine
-            if self.snd:
-                self.manage_sound()
+            self.manage_sound()
 
             if self.config.get('blocked'):
                 continue
@@ -94,13 +99,12 @@ class LockDevice(BaseDevice):
 
     def reset(self):
         """ Resetting from saved config """
-        #super().reset()
         self.logger.debug(f"running with config: {self.config.data}")
         try:
             if self.snd:
                 self.snd.enabled = self.config.get('sound')
             if not self.config.get('closed'):
-                self.timers = {}  # drop timer
+                self.timers = {}  # drop timers
                 self.open()
             else:
                 self.close()
@@ -136,30 +140,29 @@ class LockDevice(BaseDevice):
             self.closed = True  # state of GPIO
             return 'close lock'
 
-    def set_opened(self, timer=None, code=None):
+    def set_opened(self, timer: Optional[str] = None, code: Optional[str] = None):
         """Open lock with config update and timer"""
         if self.open():
             if code:
                 self.logger.info(f"[---] OPEN by {code}")
             if timer:
-                now = int(time.time())
-                self.set_main_timer(now)
+                self.new_timer(int(time.time()), self.config.get('timer'), "main")
             return self.state_update({"closed": False})
 
-    def set_closed(self, code='system'):
+    def set_closed(self, code: Optional[str] = 'system'):
         """Close lock with config update"""
         if self.close():
             self.logger.info(f"[---] CLOSE by {code}")
             return self.state_update({'closed': True})
 
-    def access_granted(self, code):
+    def access_granted(self, code: str):
         """lock user interaction access granted"""
         if self.snd:
             self.snd.play(sound='granted', channel='fg')
         # self.send_message({"message": f"{code} granted"})
         return self.set_opened(timer=True, code=code)
 
-    def access_denied(self, code=None):
+    def access_denied(self, code: Optional[str] = None):
         """lock user interaction access denied"""
         if self.snd:
             self.snd.play(sound='denied', channel='fg')
@@ -169,7 +172,7 @@ class LockDevice(BaseDevice):
             self.unlock_attempts.append(code)
         time.sleep(DEFAULT_SLEEP)
 
-    def check_id(self, _id):
+    def check_id(self, _id: Union[int, str]):
         """ Check id (code or card number) """
         code = str(_id).lower()
         self.logger.debug(f'checking id {code}')
@@ -209,6 +212,9 @@ class LockDevice(BaseDevice):
             self.logger.debug('sound module not initialized')
 
     def manage_sound(self):
+        if not self.snd:
+            return
+
         sound = self.config.get("sound")
         if sound and not self.snd.enabled:
             self.sound_on()
@@ -221,28 +227,6 @@ class LockDevice(BaseDevice):
             # play field sound without interrupts
             if not self.snd.channels['bg'].get_busy():
                 self.snd.play(sound='field', channel='bg', loops=-1)
-
-    # TODO: all timer logic should go to core
-
-    def set_main_timer(self, now: int) -> str:
-        delay = self.config.get('timer')
-        if delay:
-            self.logger.debug('lock timer start counting {}s'.format(delay))
-            return self.new_timer(now, delay, "main")
-        else:
-            self.logger.error("no time interval for auto timer set! check config.")
-
-    def new_timer(self, now: int, value: str, name: str) -> str:
-        if int(value) > 0:
-          new_value = int(now) + int(value)
-          self.timers.update({name: str(new_value)})
-          self.logger.debug(f"timer set at {now} with name {name} to {value}s")
-          return self.timers[name]
-
-    def check_timer(self, name: str, now: int) -> bool:
-        timer = self.timers.get(name)
-        if timer and int(timer) <= int(now):
-            return self.timers.pop(name)
 
     def gpio_setup(self):
         """ Setup wiringpi GPIO """
@@ -269,7 +253,7 @@ class LockDevice(BaseDevice):
                 time.sleep(DEFAULT_SLEEP)
         return self.port
 
-    def parse_data(self, serial_data):
+    def parse_data(self, serial_data: bin):
         """ Parse data from keypad """
         data = None
 
@@ -322,7 +306,7 @@ class LockDevice(BaseDevice):
                     self.serial_lock = True
                     self.set_closed()
 
-    def _serial_read(self, port, queue):
+    def _serial_read(self, port: serial.Serial, queue: Queue):
         self.logger.debug('start listening serial: {}'.format(port))
         while self.running:
             # serial_data = wpi.serialGetchar(port)
@@ -335,7 +319,8 @@ class LockDevice(BaseDevice):
     def _serial_clean(self):
         self.result = ''
 
-    def _snd_init(self, sound_dir):
+    def _snd_init(self, sound_dir: str) -> Union[SoundLoader, None]:
+        # TODO: when init failed SoundLoader should return itself with disable=True
         try:
             snd = SoundLoader(sound_dir=sound_dir)
         except Exception:

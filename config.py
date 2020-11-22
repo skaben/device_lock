@@ -10,6 +10,6 @@ ESSENTIAL = {
 
 class LockConfig(DeviceConfig):
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str):
         self.minimal_essential_conf = ESSENTIAL
         super().__init__(config_path)
