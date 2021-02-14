@@ -16,7 +16,7 @@ fi
 manual () {
   echo -e "> manual deploy process:\n"\
       "   python3.7 python3.7-venv should be installed"\
-      "   pip install --upgrade pip && pip install --user pipenv"\
+      "   pip install --upgrade pip && pip install pipenv"\
       "   pipenv update"\
       "   ./pre-run.sh reset\n"
   exit
@@ -82,7 +82,7 @@ deploy () {
 
   echo -e "> setting up virtual environment"
   pip install --upgrade pip
-  pip install --user pipenv
+  pip install pipenv
   pipenv update
 
   delete_if_exists "conf"

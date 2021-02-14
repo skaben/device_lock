@@ -3,7 +3,8 @@ Description=SKABEN Lock service
 After=network.target auditd.service
 
 [Service]
-ExecStart=${dirpath}/conf/run.sh
+WorkingDirectory=${dirpath}
+ExecStart=`which pipenv` run python skaben.py
 Restart=on-failure
 Type=idle
 
