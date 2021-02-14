@@ -1,0 +1,19 @@
+[[source]]
+url = "https://pypi.org/simple/"
+verify_ssl = false
+name = "pypi-79"
+
+[[source]]
+url = "https://pypi.fury.io/zerthmonk/"
+verify_ssl = false
+name = "skaben"
+
+[packages]
+skabenproto = {version = ">=1.18", index="skaben"}
+skabenclient = {version = ">=1.16", index="skaben"}
+pygame = ">=1.9.4"
+pyaml = ">=18.11.0"
+pyserial = ">=3.4"
+requests = ">=2.25"
+
+[dev-packages]
