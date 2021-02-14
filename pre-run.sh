@@ -3,7 +3,7 @@
 PYVER='3.7'
 trap "exit" INT
 
-help () 
+help ()
 {
   echo "Usage: pre-run.sh [install|reset|manual]"
   exit
@@ -15,12 +15,10 @@ fi
 
 manual () {
   echo -e "> manual deploy process:\n"\
-    "   python3.7 python3.7-venv should be installed\n"\
-    "   python3.7 -m venv venv\n"\
-    "   source ./venv/bin/activate\n"\
-    "   pip install --upgrade pip\n"\
-    "   pip install -r requirements.txt\n"\
-    "   ./pre-run.sh reset\n"
+      "   python3.7 python3.7-venv should be installed"\
+      "   pip install --upgrade pip && pip install --user pipenv"\
+      "   pipenv update"\
+      "   ./pre-run.sh reset\n"
   exit
 }
 
@@ -32,7 +30,7 @@ check_uname () {
   fi
 }
 
-delete_if_exists () 
+delete_if_exists ()
 {
   if [ -d $1 ]; then
     rm -rf $1
@@ -42,15 +40,16 @@ delete_if_exists ()
 
 unpack_resources ()
 {
-  delete_if_exists "resources"	
+  delete_if_exists "resources"
   if [ -f "./resources.tar.gz" ]; then
-    tar xvzf resources.tar.gz
+    echo -e "unpacking resources..."
+    tar xzf resources.tar.gz
   fi
 }
 
 lock_info ()
 {
-  echo -e "  How to autostart with systemd:\n"\
+  echo -e "\n\n  How to autostart with systemd:\n"\
           " cp ./conf/newlock.service /etc/systemd/system/\n"\
           " systemctl daemon-reload\n"\
           " systemctl enable newlock"
@@ -65,10 +64,10 @@ deploy () {
 
   PYTHON_DEV="$PYTHON-dev"
   PYTHON_VENV="$PYTHON-venv"
-   
+
   subver=$(python3 -c 'import sys; print(sys.version_info[1])')
   standalone=$($PYTHON --version)
-  
+
   if [[ $standalone == "" ]] && [[ $((subver + 0)) != 7 ]]; then
     echo '[!] application require $PYTHON'
     echo '[!] your version is:' $(python3 --version)
@@ -77,16 +76,14 @@ deploy () {
 
   echo -e "> installing dependencies with apt"
   sudo apt-get install -y --no-install-recommends $PYTHON $PYTHON_VENV $PYTHON_DEV
-  
+
   echo -e "> installing dependencies for pygame >= 2.0.0"
   sudo apt-get install -y libsdl2-dev libsdl2-ttf-2.0 libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev
 
   echo -e "> setting up virtual environment"
-  delete_if_exists "venv"
-  $PYTHON -m venv venv
-  source "./venv/bin/activate"
   pip install --upgrade pip
-  pip install -r requirements.txt --no-cache-dir
+  pip install --user pipenv
+  pipenv update
 
   delete_if_exists "conf"
   mkdir conf
@@ -97,7 +94,7 @@ deploy () {
 
 # reset
 
-reset () 
+reset ()
 {
   echo -e "[>] resetting __ LOCK __ device configuration"
   iface=$(ip route | grep "default" | sed -nr 's/.*dev ([^\ ]+).*/\1/p')
