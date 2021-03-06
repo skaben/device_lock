@@ -58,7 +58,7 @@ lock_info ()
 
 # deploy
 
-deploy () {
+system () {
 
   PYTHON="python$PYVER"
 
@@ -79,17 +79,18 @@ deploy () {
 
   echo -e "> installing dependencies for pygame >= 2.0.0"
   sudo apt-get install -y libsdl2-dev libsdl2-ttf-2.0 libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev
-
-  echo -e "> setting up virtual environment"
-  pip install --upgrade pip
-  pip install pipenv
-  pipenv update
-
+  
   delete_if_exists "conf"
   mkdir conf
+}
 
-  echo -e "... done!\n"
-  echo -e "\n  --------"
+# python env
+
+pydeps () {
+  echo -e "> setting up python3  environment"
+  python3.7 -m pip install --upgrade pip
+  python3.7 -m pip install pipenv
+  python3.7 -m pipenv update
 }
 
 # reset
@@ -111,8 +112,11 @@ reset ()
 
 if [ "$1" = 'install' ]; then
   check_uname
-  deploy
+  system
+  pydeps
   reset
+elif [ "$1" = 'pydeps' ]; then
+  pydeps
 elif [ "$1" = 'reset' ]; then
   reset
 elif [ "$1" = 'manual' ]; then
