@@ -21,6 +21,11 @@ except Exception:
 
 DEFAULT_SLEEP = .5  # 500ms
 SOUND_FADEOUT = 300  # 300ms
+SERIAL_TIMEOUT = 1
+DEFAULT_TIMER_TIME = 10 
+
+CARD_EVENT = 'CD'
+KBD_EVENT = 'KB'
 
 
 class LockDevice(BaseDevice):
@@ -38,14 +43,16 @@ class LockDevice(BaseDevice):
     def __init__(self, system_config: SystemConfig, device_config: LockConfig):
         super().__init__(system_config, device_config)
         self.port = None
-        self.keypad_data_queue = None
         self.keypad_thread = None
+        self.keypad_data_queue = Queue()
         self.timers = {}
         # set config values (without gorillas, bananas and jungles)
         self.pin = system_config.get('pin')
         self.alert = system_config.get('alert')
+        self.preferred_serial = system_config.get('comport', '/dev/ttyS1')
         # set sound
         self.snd = self._snd_init(system_config.get('sound_dir'))
+        self.logger.debug(f'{self.config.get("acl")}')
 
     def on_start(self):
         """initialize serial listener, reload device"""
@@ -56,11 +63,10 @@ class LockDevice(BaseDevice):
                 self.logger.exception(f'gpio_setup failed, cannot start device:\n{e}')
                 raise
 
-        self.keypad_data_queue = Queue()
         self.keypad_thread = th.Thread(target=self._serial_read,
                                        name='serial read Thread',
                                        args=(self.port, self.keypad_data_queue,))
-        self.keypad_thread.start()
+        self.keypad_thread.daemon = True
         self.set_closed()
 
     def run(self):
@@ -73,6 +79,7 @@ class LockDevice(BaseDevice):
         start_event = make_event('device', 'reload')
         self.q_int.put(start_event)
         self.running = True
+        self.keypad_thread.start()
 
         while self.running:
             # main routine
@@ -146,7 +153,7 @@ class LockDevice(BaseDevice):
             if code:
                 self.logger.info(f"[---] OPEN by {code}")
             if timer:
-                self.new_timer(int(time.time()), self.config.get('timer'), "main")
+                self.new_timer(int(time.time()), self.config.get('timer', DEFAULT_TIMER_TIME), "main")
             return self.state_update({"closed": False})
 
     def set_closed(self, code: Optional[str] = 'system'):
@@ -156,14 +163,14 @@ class LockDevice(BaseDevice):
             return self.state_update({'closed': True})
 
     def access_granted(self, code: str):
-        """lock user interaction access granted"""
+        """Direct User Interaction access granted"""
         if self.snd:
             self.snd.play(sound='granted', channel='fg')
         # self.send_message({"message": f"{code} granted"})
         return self.set_opened(timer=True, code=code)
 
     def access_denied(self, code: Optional[str] = None):
-        """lock user interaction access denied"""
+        """Direct User Interaction access denied"""
         if self.snd:
             self.snd.play(sound='denied', channel='fg')
         if code:
@@ -171,37 +178,105 @@ class LockDevice(BaseDevice):
             # self.send_message({"message": f"{code} denied"})
             self.unlock_attempts.append(code)
         time.sleep(DEFAULT_SLEEP)
+        return self.set_closed()
 
-    def check_id(self, _id: Union[int, str]):
+    def check_access(self, code: str):
         """ Check id (code or card number) """
-        code = str(_id).lower()
-        self.logger.debug(f'checking id {code}')
-        # in blocked state lock should deny everything
-        if self.config.get('blocked'):
-            return self.access_denied(code)
-        # in opened state lock should close on every code
-        if not self.config.get('closed'):
-            return self.set_closed(code)
-        return self.is_id_in_acl(code, self.config.get('acl'))
+        self.logger.debug(f'checking id: {code}')
+        try:
+            # in blocked state lock should deny everything
+            if self.config.get('blocked'):
+                return self.access_denied(code)
+            # in opened state lock should close on every code
+            if not self.config.get('closed'):
+                return self.set_closed(code)
 
-    def is_id_in_acl(self, code: str, acl: list):
-        if not acl:
-            self.logger.error('lock ACL is empty - no card codes in DB')
-            return self.access_denied()
+            acl = [str(c) for c in self.config.get('acl')]
+            if not acl:
+                raise AttributeError('lock ACL is empty - no card codes in DB')
 
-        if code in acl:
-            return self.access_granted(code)
-        else:
+            if code in acl:
+                return self.access_granted(code)
+            else:
+                return self.access_denied(code)
+        except Exception:
+            logging.exception(f'while checking id: {code}')
             return self.access_denied(code)
+        finally:
+            self._serial_clean()
+
+    def parse_data(self, serial_data: bin):
+        """ Parse data from keypad """
+        data = None
+
+        try:
+            data = serial_data.decode('utf-8')
+            if not data:
+                return
+        except Exception:
+            self.logger.exception(f'cannot decode serial: {serial_data}')
+            self.access_denied()
+            time.sleep(DEFAULT_SLEEP * 10)
+            return
+
+        try:
+            input_type = str(data[2:4])  # keyboard or card
+            input_data = str(data[4:]).strip()  # code entered/readed
+
+            print(f'result: {self.result} --- {input_data} {input_type}')
+
+            if self.serial_lock and input_type == CARD_EVENT:
+                time.sleep(DEFAULT_SLEEP)
+                self.serial_lock = False
+                return
+
+            if self.config.get('closed'):
+                self.check_on_input_when_closed(input_type, input_data)
+            else:
+                self.close_on_input_when_opened(input_type, iput_data)
+        except Exception:
+            self.logger.exception('while operating with controller:')
+
+    def check_on_input_when_closed(self, input_type: str, input_data: str):
+        asterisk_button = '10'
+        hash_button = '11'
+        if input_type == KBD_EVENT:
+            if input_data != asterisk_button:
+                if input_data == hash_button:
+                    try:
+                        self.check_access(self.result)
+                    except Exception:
+                        if self.snd:
+                            self.snd.play(sound='denied', channel='fg')
+                else:
+                    self.result += input_data
+            else:
+                self._serial_clean()
+        elif input_type == CARD_EVENT:
+            self.serial_lock = True
+            self.check_access(input_data)
+
+    def close_on_input_when_opened(self, input_type: str, input_data: str):
+        if input_type == KBD_EVENT:
+            # close on # button
+            if int(input_data) == 11:
+                if self.snd:
+                    self.snd.play('denied', 'fg')
+                self.set_closed()
+        elif input_type == CARD_EVENT:
+            # close on any card
+            if self.snd:
+                self.snd.play('denied', 'fg')
+            self.serial_lock = True
+            self.set_closed()
+        self._serial_clean()
 
     def sound_off(self):
         if self.snd:
             self.logger.debug('sound OFF')
-            try:
-                self.snd.fadeout(SOUND_FADEOUT)
-            except Exception:
-                self.snd.stop()
-                self.snd.enabled = None
+            for channel in self.snd.channels:
+                self.snd.stop(channel)
+            self.snd.enabled = None
 
     def sound_on(self):
         if self.snd:
@@ -228,90 +303,42 @@ class LockDevice(BaseDevice):
             if not self.snd.channels['bg'].get_busy():
                 self.snd.play(sound='field', channel='bg', loops=-1)
 
+    def connect_serial(self):
+        self.logger.debug(f"Connecting to serial {self.preferred_serial}...")
+        port = serial.Serial(self.preferred_serial, timeout=SERIAL_TIMEOUT)
+        port.baudrate = 9600
+        time.sleep(DEFAULT_SLEEP)
+        if port:
+            return port
+        else: 
+            self.logger.debug(f'Failed to connect to serial {self.prefferred_serial}')
+
     def gpio_setup(self):
         """ Setup wiringpi GPIO """
+        port = None
         wpi.wiringPiSetup()
         wpi.pinMode(self.pin, 1)
         wpi.digitalWrite(self.pin, 0)
-        time.sleep(DEFAULT_SLEEP)
-        while not self.port:
+        while not port:
+            time.sleep(DEFAULT_SLEEP)
             try:
-                self.port = serial.Serial('/dev/ttyS1')
-                self.port.baudrate = 9600
-                self.logger.debug("Connected to /dev/ttyS1")
+                port = self.connect_serial()
             except Exception:
-                try:
-                    self.port = serial.Serial('/dev/ttyAMA1')
-                    self.port.baudrate = 9600
-                except Exception:
-                    self.logger.exception('cannot connect serial!')
-                else:
-                    self.logger.debug("Connected to /dev/ttyAMA1")
-            else:
-                self.logger.debug('failed to connect to serial')
-            finally:
-                time.sleep(DEFAULT_SLEEP)
-        return self.port
+                self.preferred_serial = 'dev/ttyAMA1'
+                port = self.connect_serial()
 
-    def parse_data(self, serial_data: bin):
-        """ Parse data from keypad """
-        data = None
-
-        try:
-            data = serial_data.decode('utf-8')
-            # self.logger.debug('get serial: {}'.format(data))
-        except Exception:
-            self.logger.exception(f'cannot decode serial: {serial_data}')
-            self.access_denied()
-            time.sleep(DEFAULT_SLEEP * 10)
-
-        if data:
-            input_type = data[2:4]  # keyboard or card
-            input_data = str(data[4:]).strip()  # code entered/readed
-            if self.serial_lock and input_data == 'CD':
-                time.sleep(DEFAULT_SLEEP)
-                self.serial_lock = False
-                return
-
-            if self.config.get('closed'):
-                # lock CLOSED
-                # keyboard event registered
-                if input_type == 'KB':
-                    if int(input_data) == 10:
-                        self._serial_clean()
-                    else:
-                        if int(input_data) == 11:
-                            try:
-                                self.check_id(self.result)
-                            except Exception:
-                                if self.snd:
-                                    self.snd.play(sound='denied', channel='fg')
-                        else:
-                            self.result += str(input_data)
-                elif input_type == 'CD':
-                    self.serial_lock = True
-                    # card action registered
-                    self.check_id(input_data)
-                    self._serial_clean()
-            else:
-                # lock OPENED
-                if input_type == 'KB':
-                    if int(input_data) == 11:
-                        if self.snd:
-                            self.snd.play('denied', 'fg')
-                        self.set_closed()
-                elif input_type == 'CD':
-                    if self.snd:
-                        self.snd.play('denied', 'fg')
-                    self.serial_lock = True
-                    self.set_closed()
+        if port:
+            self.port = port
+            return self.port
+        else:
+            raise Exception('no serial port connection acquired, exiting')
 
     def _serial_read(self, port: serial.Serial, queue: Queue):
         self.logger.debug('start listening serial: {}'.format(port))
-        while self.running:
-            # serial_data = wpi.serialGetchar(port)
+        while True:
             serial_data = port.readline()
             if serial_data:
+                self.logger.debug(f'new data from serial: {serial_data}')
                 queue.put(serial_data)
             else:
                 time.sleep(DEFAULT_SLEEP / 5)
