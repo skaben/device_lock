@@ -11,5 +11,5 @@ pyserial==3.5
 PyYAML==5.4.1
 requests==2.25.1
 skabenclient>=1.16
-skabenproto>=1.18
-urllib3==1.26.4
+skabenproto>=1.19
+urllib3>=1.26.4

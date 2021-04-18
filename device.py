@@ -1,5 +1,6 @@
 import pygame as pg
 import serial
+import logging
 import time
 import threading as th
 
@@ -16,13 +17,13 @@ from config import LockConfig
 try:
     pg.mixer.pre_init()
 except Exception:
-    self.logger.exception('pre-init mixer failed: ')
+    logging.exception('pre-init mixer failed: ')
 
 
 DEFAULT_SLEEP = .5  # 500ms
 SOUND_FADEOUT = 300  # 300ms
 SERIAL_TIMEOUT = 1
-DEFAULT_TIMER_TIME = 10 
+DEFAULT_TIMER_TIME = 10
 
 CARD_EVENT = 'CD'
 KBD_EVENT = 'KB'
@@ -37,7 +38,6 @@ class LockDevice(BaseDevice):
     snd = None  # sound module
     closed = None
     running = None
-    unlock_attempts = []
     config_class = LockConfig
 
     def __init__(self, system_config: SystemConfig, device_config: LockConfig):
@@ -166,7 +166,7 @@ class LockDevice(BaseDevice):
         """Direct User Interaction access granted"""
         if self.snd:
             self.snd.play(sound='granted', channel='fg')
-        # self.send_message({"message": f"{code} granted"})
+        self.send_message({"message": f"{code} granted"})
         return self.set_opened(timer=True, code=code)
 
     def access_denied(self, code: Optional[str] = None):
@@ -175,8 +175,7 @@ class LockDevice(BaseDevice):
             self.snd.play(sound='denied', channel='fg')
         if code:
             self.logger.info(f"[---] DENIED to {code}")
-            # self.send_message({"message": f"{code} denied"})
-            self.unlock_attempts.append(code)
+            self.send_message({"message": f"{code} denied"})
         time.sleep(DEFAULT_SLEEP)
         return self.set_closed()
 
@@ -233,7 +232,7 @@ class LockDevice(BaseDevice):
             if self.config.get('closed'):
                 self.check_on_input_when_closed(input_type, input_data)
             else:
-                self.close_on_input_when_opened(input_type, iput_data)
+                self.close_on_input_when_opened(input_type, input_data)
         except Exception:
             self.logger.exception('while operating with controller:')
 
@@ -310,7 +309,7 @@ class LockDevice(BaseDevice):
         time.sleep(DEFAULT_SLEEP)
         if port:
             return port
-        else: 
+        else:
             self.logger.debug(f'Failed to connect to serial {self.prefferred_serial}')
 
     def gpio_setup(self):
