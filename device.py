@@ -202,6 +202,7 @@ class LockDevice(BaseDevice):
             logging.exception(f'while checking id: {code}')
             return self.access_denied(code)
         finally:
+            time.sleep(DEFAULT_SLEEP)
             self._serial_clean()
 
     def parse_data(self, serial_data: bin):
@@ -223,11 +224,6 @@ class LockDevice(BaseDevice):
             input_data = str(data[4:]).strip()  # code entered/readed
 
             print(f'result: {self.result} --- {input_data} {input_type}')
-
-            if self.serial_lock and input_type == CARD_EVENT:
-                time.sleep(DEFAULT_SLEEP)
-                self.serial_lock = False
-                return
 
             if self.config.get('closed'):
                 self.check_on_input_when_closed(input_type, input_data)
@@ -252,6 +248,8 @@ class LockDevice(BaseDevice):
             else:
                 self._serial_clean()
         elif input_type == CARD_EVENT:
+            if self.serial_lock:
+                return
             self.serial_lock = True
             self.check_access(input_data)
 
@@ -263,10 +261,11 @@ class LockDevice(BaseDevice):
                     self.snd.play('denied', 'fg')
                 self.set_closed()
         elif input_type == CARD_EVENT:
-            # close on any card
+            if self.serial_lock:
+                return
+            self.serial_lock = True
             if self.snd:
                 self.snd.play('denied', 'fg')
-            self.serial_lock = True
             self.set_closed()
         self._serial_clean()
 
@@ -344,6 +343,7 @@ class LockDevice(BaseDevice):
 
     def _serial_clean(self):
         self.result = ''
+        self.serial_lock = None
 
     def _snd_init(self, sound_dir: str) -> Union[SoundLoader, None]:
         # TODO: when init failed SoundLoader should return itself with disable=True

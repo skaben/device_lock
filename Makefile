@@ -8,12 +8,13 @@ install:
 	@sudo apt install -y libsdl2-dev libsdl2-ttf-2.0 libsdl2-ttf-dev libsdl2-image-dev libsdl2-mixer-dev
 	@python3.7 -m pip install --upgrade pip
 	@python3.7 -m pip install -r requirements.txt
-	@tar xvf resources.tar.gz
 
 .PHONY: config
 config:
+	@mkdir conf resources
 	@chmod +x ./templates/make-conf.sh
 	@./templates/make-conf.sh
+	@tar xvf resources.tar.gz
 	@echo 'config created, check ./conf'
 
 .PHONY: orange-wpi
