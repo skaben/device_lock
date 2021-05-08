@@ -126,7 +126,7 @@ class LockDevice(BaseDevice):
     def open(self):
         """Open lock low-level operation"""
         if self.closed:
-            if self.snd:
+            if self.sound_enabled:
                 self.snd.fadeout(SOUND_FADEOUT * 4, 'bg')
                 self.snd.play(sound='off', channel='fg', delay=DEFAULT_SLEEP * 3)
             time.sleep(DEFAULT_SLEEP * 2)
@@ -140,14 +140,14 @@ class LockDevice(BaseDevice):
     def close(self):
         """Close lock low-level operation"""
         if not self.closed:
-            if self.snd:
+            if self.sound_enabled:
                 self.snd.play(sound='on', channel='fg', delay=DEFAULT_SLEEP)
                 self.snd.play(sound='field', channel='bg', delay=DEFAULT_SLEEP * 2, loops=-1, fade_ms=SOUND_FADEOUT * 4)
             wpi.digitalWrite(self.pin, True)
             self.closed = True  # state of GPIO
             return 'close lock'
 
-    def set_opened(self, timer: Optional[str] = None, code: Optional[str] = None):
+    def set_opened(self, timer: Optional[bool] = None, code: Optional[str] = None):
         """Open lock with config update and timer"""
         if self.open():
             if code:
@@ -164,14 +164,14 @@ class LockDevice(BaseDevice):
 
     def access_granted(self, code: str):
         """Direct User Interaction access granted"""
-        if self.snd:
+        if self.sound_enabled:
             self.snd.play(sound='granted', channel='fg')
         self.send_message({"message": f"{code} granted"})
         return self.set_opened(timer=True, code=code)
 
     def access_denied(self, code: Optional[str] = None):
         """Direct User Interaction access denied"""
-        if self.snd:
+        if self.sound_enabled:
             self.snd.play(sound='denied', channel='fg')
         if code:
             self.logger.info(f"[---] DENIED to {code}")
@@ -241,7 +241,7 @@ class LockDevice(BaseDevice):
                     try:
                         self.check_access(self.result)
                     except Exception:
-                        if self.snd:
+                        if self.sound_enabled:
                             self.snd.play(sound='denied', channel='fg')
                 else:
                     self.result += input_data
@@ -257,14 +257,14 @@ class LockDevice(BaseDevice):
         if input_type == KBD_EVENT:
             # close on # button
             if int(input_data) == 11:
-                if self.snd:
+                if self.sound_enabled:
                     self.snd.play('denied', 'fg')
                 self.set_closed()
         elif input_type == CARD_EVENT:
             if self.serial_lock:
                 return
             self.serial_lock = True
-            if self.snd:
+            if self.sound_enabled:
                 self.snd.play('denied', 'fg')
             self.set_closed()
         self._serial_clean()
@@ -283,6 +283,11 @@ class LockDevice(BaseDevice):
         else:
             self.send_message({"error": "sound module init failed"})
             self.logger.debug('sound module not initialized')
+
+    @property
+    def sound_enabled(self):
+        if self.snd and self.snd.enabled:
+            return True
 
     def manage_sound(self):
         if not self.snd:
