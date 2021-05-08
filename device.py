@@ -85,6 +85,8 @@ class LockDevice(BaseDevice):
             self.manage_sound()
 
             if self.config.get('blocked'):
+                if not self.closed:
+                    self.set_closed()
                 continue
 
             if self.closed and not self.config.get('closed'):
