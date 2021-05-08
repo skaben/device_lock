@@ -67,7 +67,6 @@ class LockDevice(BaseDevice):
                                        name='serial read Thread',
                                        args=(self.port, self.keypad_data_queue,))
         self.keypad_thread.daemon = True
-        self.set_closed()
 
     def run(self):
         """ Running lock
