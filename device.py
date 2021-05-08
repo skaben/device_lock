@@ -87,6 +87,9 @@ class LockDevice(BaseDevice):
             if self.config.get('blocked'):
                 continue
 
+            if self.config.get('closed'):
+                self.close()
+
             if not self.config.get('closed'):
                 # close by timer
                 if self.check_timer("main", int(time.time())):
