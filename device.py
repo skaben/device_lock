@@ -31,7 +31,7 @@ KBD_EVENT = 'KB'
 
 class LockDevice(BaseDevice):
 
-    """ Smart Lock device handler """
+    """ Smart Lock device """
 
     result = ''  # read from serial
     serial_lock = None
