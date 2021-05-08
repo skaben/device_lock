@@ -87,7 +87,10 @@ class LockDevice(BaseDevice):
             if self.config.get('blocked'):
                 continue
 
-            if self.config.get('closed'):
+            if self.closed and not self.config.get('closed'):
+                self.open()
+
+            if not self.closed and self.config.get('closed'):
                 self.close()
 
             if not self.config.get('closed'):
