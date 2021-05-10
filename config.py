@@ -1,3 +1,4 @@
+import logging
 from skabenclient.config import DeviceConfig
 
 ESSENTIAL = {
@@ -36,6 +37,7 @@ class LockConfig(DeviceConfig):
             if current_alert in state_list:
                 result.append(code)
 
+        logging.debug(f'ACL regen, current ACL is: {result}')
         return result
 
     def save(self, *args, **kwargs):
