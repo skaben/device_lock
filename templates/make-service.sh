@@ -16,4 +16,3 @@ systemctl daemon-reload
 systemctl disable newlock &> /dev/null
 systemctl enable skabenlock
 systemctl start skabenlock
-systemctl status skabenlock

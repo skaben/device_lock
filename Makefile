@@ -17,6 +17,12 @@ config:
 	@tar xvf resources.tar.gz
 	@echo 'config created, check ./conf'
 
+.PHONY: systemctl
+systemctl:
+	@chmod +x ./templates/make-service.sh
+	@sh ./templates/make-service.sh
+	@systemctl status skabenlock
+
 .PHONY: orange-wpi
 orange-wpi:
 	@echo 'NOT IMPLEMENTED'
