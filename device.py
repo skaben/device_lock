@@ -84,6 +84,14 @@ class LockDevice(BaseDevice):
             # main routine
             self.manage_sound()
 
+            # Это должно быть сверху, потому что иначе неправильно работает игровой фидбек от замка в blocked статусе
+            if not self.keypad_data_queue.empty():
+                # reading serial from keypads.
+                data = self.keypad_data_queue.get()
+                self.parse_data(data)
+            else:
+                time.sleep(DEFAULT_SLEEP / 5)
+
             if self.config.get('blocked'):
                 if not self.closed:
                     self.set_closed()
@@ -99,14 +107,6 @@ class LockDevice(BaseDevice):
                 # close by timer
                 if self.check_timer("main", int(time.time())):
                     self.set_closed()
-
-            if not self.keypad_data_queue.empty():
-                # reading serial from keypads
-                data = self.keypad_data_queue.get()
-                if data:
-                    self.parse_data(data)
-            else:
-                time.sleep(DEFAULT_SLEEP / 5)
 
         else:
             return self.stop()
@@ -140,7 +140,7 @@ class LockDevice(BaseDevice):
             wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
-            if self.snd:
+            if self.sound_enabled:
                 self.snd.stop('bg')
             return 'open lock'
 
@@ -197,9 +197,7 @@ class LockDevice(BaseDevice):
             if not self.config.get('closed'):
                 return self.set_closed(code)
 
-            acl = [str(c) for c in self.config.get('acl')]
-            if not acl:
-                raise AttributeError('lock ACL is empty - no card codes in DB')
+            acl = self.config.access_list
 
             if code in acl:
                 return self.access_granted(code)
@@ -230,7 +228,7 @@ class LockDevice(BaseDevice):
             input_type = str(data[2:4])  # keyboard or card
             input_data = str(data[4:]).strip()  # code entered/readed
 
-            print(f'result: {self.result} --- {input_data} {input_type}')
+            self.logger.debug(f'result: {self.result} --- {input_data} {input_type}')
 
             if self.config.get('closed'):
                 self.check_on_input_when_closed(input_type, input_data)
