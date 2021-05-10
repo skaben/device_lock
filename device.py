@@ -140,7 +140,7 @@ class LockDevice(BaseDevice):
             wpi.digitalWrite(self.pin, False)
             self.closed = False  # state of GPIO
             # additional field sound check
-            if self.snd:
+            if self.sound_enabled:
                 self.snd.stop('bg')
             return 'open lock'
 
