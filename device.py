@@ -228,7 +228,7 @@ class LockDevice(BaseDevice):
             input_type = str(data[2:4])  # keyboard or card
             input_data = str(data[4:]).strip()  # code entered/readed
 
-            print(f'result: {self.result} --- {input_data} {input_type}')
+            self.logger.debug(f'result: {self.result} --- {input_data} {input_type}')
 
             if self.config.get('closed'):
                 self.check_on_input_when_closed(input_type, input_data)
