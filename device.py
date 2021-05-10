@@ -197,9 +197,7 @@ class LockDevice(BaseDevice):
             if not self.config.get('closed'):
                 return self.set_closed(code)
 
-            acl = [str(c) for c in self.config.get('acl')]
-            if not acl:
-                raise AttributeError('lock ACL is empty - no card codes in DB')
+            acl = self.config.access_list
 
             if code in acl:
                 return self.access_granted(code)
