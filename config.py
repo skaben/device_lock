@@ -11,7 +11,7 @@ ESSENTIAL = {
 class LockConfig(DeviceConfig):
 
     def __init__(self, config_path: str):
-        self.parsed_acl = self.gen_access_list()
+        self.parsed_acl = []
         self.minimal_essential_conf = ESSENTIAL
         super().__init__(config_path)
 
@@ -40,4 +40,8 @@ class LockConfig(DeviceConfig):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+        self.gen_access_list()
+
+    def load(self, *args, **kwargs):
+        super().load(*args, **kwargs)
         self.gen_access_list()
