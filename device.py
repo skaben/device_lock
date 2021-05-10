@@ -103,8 +103,7 @@ class LockDevice(BaseDevice):
             if not self.keypad_data_queue.empty():
                 # reading serial from keypads
                 data = self.keypad_data_queue.get()
-                if data:
-                    self.parse_data(data)
+                self.parse_data(data)
             else:
                 time.sleep(DEFAULT_SLEEP / 5)
 
