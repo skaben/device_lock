@@ -32,4 +32,4 @@ clean:
 .PHONY: run
 run:
 	@cd ${shell pwd}
-	@python3.7 app.py
+	@sudo python3.7 app.py
