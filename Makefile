@@ -17,6 +17,13 @@ config:
 	@tar xvf resources.tar.gz
 	@echo 'config created, check ./conf'
 
+.PHONY: service
+service:
+	@chmod +x ./templates/make-service.sh
+	@sh ./templates/make-service.sh
+	@echo 'service installed as /etc/systemd/system/skabenlock.service'
+	@systemctl status skabenlock
+
 .PHONY: orange-wpi
 orange-wpi:
 	@echo 'NOT IMPLEMENTED'
