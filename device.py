@@ -84,6 +84,14 @@ class LockDevice(BaseDevice):
             # main routine
             self.manage_sound()
 
+            # Это должно быть сверху, потому что иначе неправильно работает игровой фидбек от замка в blocked статусе
+            if not self.keypad_data_queue.empty():
+                # reading serial from keypads.
+                data = self.keypad_data_queue.get()
+                self.parse_data(data)
+            else:
+                time.sleep(DEFAULT_SLEEP / 5)
+
             if self.config.get('blocked'):
                 if not self.closed:
                     self.set_closed()
@@ -99,13 +107,6 @@ class LockDevice(BaseDevice):
                 # close by timer
                 if self.check_timer("main", int(time.time())):
                     self.set_closed()
-
-            if not self.keypad_data_queue.empty():
-                # reading serial from keypads
-                data = self.keypad_data_queue.get()
-                self.parse_data(data)
-            else:
-                time.sleep(DEFAULT_SLEEP / 5)
 
         else:
             return self.stop()
