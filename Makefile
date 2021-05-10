@@ -29,3 +29,7 @@ clean:
 	@rm -rf ./conf
 	@rm -rf ./resources	
 
+.PHONY: run
+run:
+	@cd ${shell pwd}
+	@python3.7 app.py
