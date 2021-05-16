@@ -5,7 +5,7 @@ ESSENTIAL = {
     'closed': True,
     'sound': True,
     'blocked': False,
-    'acl': [],
+    'acl': {},
 }
 
 
