@@ -90,11 +90,7 @@ class LockDevice(BaseDevice):
                 data = self.keypad_data_queue.get()
                 self.parse_data(data)
             # blocked rules all
-            if self.config.get('blocked'):
-                self.close()
-                continue
-            # closing by timer
-            if self.check_timer("main", int(time.time())):
+            if self.config.get('blocked') or self.check_timer("main", int(time.time())):
                 self.set_closed()
                 continue
             # sync state - opening
@@ -158,12 +154,14 @@ class LockDevice(BaseDevice):
             if timer:
                 from_now = int(time.time())
                 plus_seconds = self.config.get('timer', DEFAULT_TIMER_TIME)
-                self.new_timer(from_now, plus_seconds, "main")
+                if plus_seconds > 0:
+                    self.new_timer(from_now, plus_seconds, "main")
             return self.state_update({"closed": False})
 
     def set_closed(self, code: Optional[str] = 'system'):
         """Close lock with config update"""
         if self.close():
+            self.timers = {}
             self.logger.info(f"[---] CLOSE by {code}")
             return self.state_update({'closed': True})
 
