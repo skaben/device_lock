@@ -91,8 +91,7 @@ class LockDevice(BaseDevice):
                 self.parse_data(data)
             # blocked rules all
             if self.config.get('blocked'):
-                if not self.closed:
-                    self.set_closed()
+                self.close()
                 continue
             # closing by timer
             if self.check_timer("main", int(time.time())):
