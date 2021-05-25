@@ -81,33 +81,24 @@ class LockDevice(BaseDevice):
         self.keypad_thread.start()
 
         while self.running:
+            time.sleep(DEFAULT_SLEEP / 5)
             # main routine
             self.manage_sound()
-
             # Это должно быть сверху, потому что иначе неправильно работает игровой фидбек от замка в blocked статусе
             if not self.keypad_data_queue.empty():
                 # reading serial from keypads.
                 data = self.keypad_data_queue.get()
                 self.parse_data(data)
-            else:
-                time.sleep(DEFAULT_SLEEP / 5)
-
-            if self.config.get('blocked'):
-                if not self.closed:
-                    self.set_closed()
+            # blocked rules all
+            if self.config.get('blocked') or self.check_timer("main", int(time.time())):
+                self.set_closed()
                 continue
-
+            # sync state - opening
             if self.closed and not self.config.get('closed'):
                 self.open()
-
+            # sync state - closing
             if not self.closed and self.config.get('closed'):
                 self.close()
-
-            if not self.config.get('closed'):
-                # close by timer
-                if self.check_timer("main", int(time.time())):
-                    self.set_closed()
-
         else:
             return self.stop()
 
@@ -157,15 +148,20 @@ class LockDevice(BaseDevice):
     def set_opened(self, timer: Optional[bool] = None, code: Optional[str] = None):
         """Open lock with config update and timer"""
         if self.open():
+            self.timers = {}  # resetting timers
             if code:
                 self.logger.info(f"[---] OPEN by {code}")
             if timer:
-                self.new_timer(int(time.time()), self.config.get('timer', DEFAULT_TIMER_TIME), "main")
+                from_now = int(time.time())
+                plus_seconds = self.config.get('timer', DEFAULT_TIMER_TIME)
+                if plus_seconds > 0:
+                    self.new_timer(from_now, plus_seconds, "main")
             return self.state_update({"closed": False})
 
     def set_closed(self, code: Optional[str] = 'system'):
         """Close lock with config update"""
         if self.close():
+            self.timers = {}
             self.logger.info(f"[---] CLOSE by {code}")
             return self.state_update({'closed': True})
 
