@@ -169,7 +169,11 @@ class LockDevice(BaseDevice):
         """Direct User Interaction access granted"""
         if self.sound_enabled:
             self.snd.play(sound='granted', channel='fg')
-        self.send_message({"message": f"{code} granted"})
+        self.send_message({
+            "type": "access",
+            "content": f"{code}",
+            "success": True,
+        })
         return self.set_opened(timer=True, code=code)
 
     def access_denied(self, code: Optional[str] = None):
@@ -178,7 +182,11 @@ class LockDevice(BaseDevice):
             self.snd.play(sound='denied', channel='fg')
         if code:
             self.logger.info(f"[---] DENIED to {code}")
-            self.send_message({"message": f"{code} denied"})
+            self.send_message({
+                "type": "access",
+                "content": f"{code}",
+                "success": False
+            })
         time.sleep(DEFAULT_SLEEP)
         return self.set_closed()
 
@@ -186,9 +194,11 @@ class LockDevice(BaseDevice):
         """ Check id (code or card number) """
         self.logger.debug(f'checking id: {code}')
         try:
-            # in blocked state lock should deny everything
+            # in blocked state lock should ignore everything
             if self.config.get('blocked'):
-                return self.access_denied(code)
+                time.sleep(DEFAULT_SLEEP)
+                self._serial_clean()
+                return
             # in opened state lock should close on every code
             if not self.config.get('closed'):
                 return self.set_closed(code)
@@ -208,8 +218,6 @@ class LockDevice(BaseDevice):
 
     def parse_data(self, serial_data: bin):
         """ Parse data from keypad """
-        data = None
-
         try:
             data = serial_data.decode('utf-8')
             if not data:
@@ -224,7 +232,7 @@ class LockDevice(BaseDevice):
             input_type = str(data[2:4])  # keyboard or card
             input_data = str(data[4:]).strip()  # code entered/readed
 
-            self.logger.debug(f'result: {self.result} --- {input_data} {input_type}')
+            self.logger.debug(f'serial data parsed as: {self.result} --- {input_data} {input_type}')
 
             if self.config.get('closed'):
                 self.check_on_input_when_closed(input_type, input_data)
@@ -282,7 +290,10 @@ class LockDevice(BaseDevice):
             self.logger.debug('sound ON')
             self.snd.enabled = True
         else:
-            self.send_message({"error": "sound module init failed"})
+            self.send_message({
+                "level": "error",
+                "message": "sound module init failed"
+            })
             self.logger.debug('sound module not initialized')
 
     @property
@@ -341,7 +352,7 @@ class LockDevice(BaseDevice):
         self.logger.debug('start listening serial: {}'.format(port))
         while True:
             serial_data = port.readline()
-            if serial_data:
+            if serial_data and not self.serial_lock:
                 self.logger.debug(f'new data from serial: {serial_data}')
                 queue.put(serial_data)
             else:
