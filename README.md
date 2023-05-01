@@ -19,6 +19,12 @@
 
 как поставить:
 
-`./pre-run.sh install`\
+`make install` - поставить зависимости\
+`make config` - сгенерировать базовый конфиг\
+`make service` - добавить автозапуск через systemd\
+
 конфигурация системы - `conf/system.yml`\
-[описание параметров конфигурации](https://github.com/skaben/device_boilerplate)
+конфигурация девайса (обновляется автоматически) - `conf\device.yml`\
+
+
+[полное описание параметров конфигурации](https://github.com/skaben/device_boilerplate)
